@@ -1,0 +1,139 @@
+name: Release
+
+# Triggered by a version tag: git tag v1.2.3 && git push --tags
+on:
+  push:
+    tags:
+      - 'v[0-9]+.*'
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY: moldx
+
+jobs:
+  # ── 1. Gate: all tests must pass before any build starts ─────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test
+
+  # ── 2. Cross-platform build matrix ───────────────────────────────────────
+  build:
+    name: Build — ${{ matrix.asset_name }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 — statically linked via musl for maximum portability
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            asset_name: moldx-linux-x86_64
+            musl_linker: CC_x86_64_unknown_linux_musl=musl-gcc
+
+          # Linux aarch64 — native ARM64 runner + musl
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-musl
+            asset_name: moldx-linux-aarch64
+            musl_linker: CC_aarch64_unknown_linux_musl=musl-gcc
+
+          # macOS Apple Silicon (native on macos-latest M1 runner)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_name: moldx-macos-aarch64
+            musl_linker: ''
+
+          # macOS Intel (cross-compiled on M1 runner via Apple SDK)
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset_name: moldx-macos-x86_64
+            musl_linker: ''
+
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_name: moldx-windows-x86_64.exe
+            musl_linker: ''
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # musl-gcc is the static C runtime linker used for *-linux-musl targets
+      - name: Install musl-tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      # Expose the musl linker to cargo via an env var named after the target
+      - name: Export musl linker env var
+        if: matrix.musl_linker != ''
+        run: echo "${{ matrix.musl_linker }}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Copy the binary to the root with the final asset name so upload-artifact
+      # picks up a single, predictably named file regardless of platform.
+      - name: Rename binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cp "target/${{ matrix.target }}/release/${{ env.BINARY }}" \
+             "${{ matrix.asset_name }}"
+
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "target/${{ matrix.target }}/release/${{ env.BINARY }}.exe" `
+                    "${{ matrix.asset_name }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
+          if-no-files-found: error
+
+  # ── 3. Publish GitHub Release with all assets ─────────────────────────────
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create releases and upload assets
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      # Download all build artifacts into artifacts/ (flattened)
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -lh artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true   # auto-fills body from merged PR titles
+          fail_on_unmatched_files: true
+        env:
+          # GITHUB_TOKEN is provisioned automatically by Actions — no manual secret needed.
+          # If you need to push to another repo, override with a PAT stored in
+          # Settings → Secrets → Actions → RELEASE_TOKEN.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

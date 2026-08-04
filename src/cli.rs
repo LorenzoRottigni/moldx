@@ -1,0 +1,63 @@
+//! CLI argument definitions for moldx.
+//!
+//! Built with [clap](https://docs.rs/clap). Global options (`--moldx-dir`,
+//! `--commands-dir`) are also readable from the `MOLDX_DIR` and
+//! `MOLDX_COMMANDS_DIR` environment variables so they can be set once in a
+//! shell profile for a project-wide override.
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
+
+/// Top-level CLI structure parsed by clap.
+#[derive(Parser)]
+#[command(
+    name = "moldx",
+    about = "Technology-agnostic orchestration engine for submodule lifecycle management",
+    long_about = "Standardizes submodule lifecycle management through user-defined shell-based strategies.\n\nUsage: moldx [strategy] <command> <path>"
+)]
+pub struct Cli {
+    /// Override the .moldx directory location (or set MOLDX_DIR env var)
+    #[arg(long, env = "MOLDX_DIR", global = true)]
+    pub moldx_dir: Option<String>,
+
+    /// Override the commands directory location (or set MOLDX_COMMANDS_DIR env var)
+    #[arg(long, env = "MOLDX_COMMANDS_DIR", global = true)]
+    pub commands_dir: Option<String>,
+
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+/// All subcommands exposed by moldx.
+#[derive(Subcommand)]
+pub enum Commands {
+    /// Launch the interactive terminal UI
+    Ui,
+
+    /// Start the web UI server
+    Serve {
+        /// Port to listen on
+        #[arg(long, short, default_value = "8080")]
+        port: u16,
+    },
+
+    /// Detect available strategies for a given path
+    Detect {
+        /// Target module path
+        path: PathBuf,
+    },
+
+    /// List all discovered modules under a root path
+    List {
+        /// Root path to scan (defaults to current directory)
+        path: Option<PathBuf>,
+
+        /// Maximum directory depth to scan
+        #[arg(long, default_value = "3")]
+        depth: usize,
+    },
+
+    /// Run a command: moldx [strategy] <command> <path>
+    /// Strategy is optional; if omitted, the best matching strategy variant is used.
+    #[command(external_subcommand)]
+    Run(Vec<String>),
+}

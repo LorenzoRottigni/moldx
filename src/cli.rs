@@ -24,7 +24,7 @@ pub struct Cli {
     pub commands_dir: Option<String>,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 /// All subcommands exposed by moldx.

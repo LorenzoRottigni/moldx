@@ -296,6 +296,7 @@ impl AppState {
     ///
     /// Prefer [`get_summaries`] + [`get_output`] in hot render paths to avoid
     /// cloning output for every process on every tick.
+    #[allow(dead_code)]
     pub fn get_all(&self) -> Vec<RunningProcess> {
         self.inner.lock().unwrap().processes.clone()
     }

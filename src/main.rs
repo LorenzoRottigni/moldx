@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let moldx_dir_override = cli.moldx_dir.as_deref().map(std::path::Path::new);
     let commands_dir_override = cli.commands_dir.as_deref().map(std::path::Path::new);
 
-    match cli.command {
+    match cli.command.unwrap_or(Commands::Ui) {
         Commands::Ui => {
             let cfg = config::MoldxConfig::resolve(
                 &std::env::current_dir()?,

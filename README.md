@@ -194,20 +194,21 @@ moldx list ./services
 moldx list --depth 5
 ```
 
-#### `moldx ui`
+#### `moldx`
 
-Launch the interactive terminal UI. Requires a `.moldx/` directory to be reachable
-from the current working directory.
+Launch the interactive terminal UI by default. Requires a `.moldx/` directory to be
+reachable from the current working directory. `moldx ui` is still accepted as an
+explicit alias.
 
 ```bash
-MOLDX_DIR=$PWD/.moldx moldx ui
+MOLDX_DIR=$PWD/.moldx moldx
 ```
 
 ---
 
 ## User Interfaces
 
-### Terminal UI (`moldx ui`)
+### Terminal UI (`moldx`)
 
 Three-panel layout driven by ratatui:
 
@@ -410,7 +411,7 @@ The `playground/` directory is a fully-wired moldx project you can use immediate
 
 ```bash
 # Terminal UI
-MOLDX_DIR=$PWD/playground/.moldx cargo run -- ui
+MOLDX_DIR=$PWD/playground/.moldx cargo run --
 
 # CLI commands
 MOLDX_DIR=$PWD/playground/.moldx cargo run -- docker build playground/modules/auth-service

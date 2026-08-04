@@ -33,13 +33,6 @@ pub enum Commands {
     /// Launch the interactive terminal UI
     Ui,
 
-    /// Start the web UI server
-    Serve {
-        /// Port to listen on
-        #[arg(long, short, default_value = "8080")]
-        port: u16,
-    },
-
     /// Detect available strategies for a given path
     Detect {
         /// Target module path

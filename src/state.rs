@@ -1,4 +1,4 @@
-//! Process registry shared across the executor, TUI and web server.
+//! Process registry shared across the executor and TUI.
 //!
 //! [`AppState`] is a cheaply-cloneable handle backed by an `Arc<Mutex<_>>`.
 //! All public methods acquire the mutex for the minimum time needed — no

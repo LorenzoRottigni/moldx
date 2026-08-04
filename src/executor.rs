@@ -7,7 +7,7 @@
 //!   by the CLI `run` subcommand.
 //! * [`run_and_track`] — spawn a strategy script in the background, capture
 //!   its stdout/stderr into [`AppState`], and update the process status when
-//!   it finishes.  Used by the TUI and web server.
+//!   it finishes.  Used by the TUI.
 use anyhow::Result;
 use std::path::Path;
 use std::process::Stdio;

@@ -203,15 +203,6 @@ from the current working directory.
 MOLDX_DIR=$PWD/.moldx moldx ui
 ```
 
-#### `moldx serve [--port <n>]`
-
-Start the web UI server (default port: 8080).
-
-```bash
-MOLDX_DIR=$PWD/.moldx moldx serve
-MOLDX_DIR=$PWD/.moldx moldx serve --port 3000
-```
-
 ---
 
 ## User Interfaces
@@ -240,24 +231,6 @@ Three-panel layout driven by ratatui:
 | `r` | Re-scan modules in the background |
 | `q` or `Ctrl+C` | Quit |
 
-### Web UI (`moldx serve`)
-
-Single-page app served at `http://localhost:<port>`:
-
-- **Left panel** — discovered modules (auto-refreshes every 30 s)
-- **Centre panel** — strategy groups with clickable command buttons
-- **Right panel** — running processes with status badges and output preview (auto-refreshes every 2 s)
-
-REST API endpoints (JSON):
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/modules` | List of all detected modules |
-| `POST` | `/api/run` | Spawn a command `{module_path, strategy, command}` |
-| `GET` | `/api/running` | List of all tracked processes |
-| `DELETE` | `/api/running/:id` | Kill a process by id |
-
----
 
 ## How It Works — Behind the Scenes
 
@@ -317,7 +290,7 @@ where `<resolved-script>` is either:
 - stdio is **inherited** from moldx — output streams directly to the terminal
 - the script's **exact exit code is forwarded** to the caller via `std::process::exit`
 
-**Background (`run_and_track`)** — used by the TUI and web server:
+**Background (`run_and_track`)** — used by the TUI:
 
 - the child bash process is placed in its **own process group** (`process_group(0)`)
   so that `kill -TERM -<pgid>` terminates the entire subprocess tree, not just bash
@@ -338,8 +311,8 @@ add_process()
 ```
 
 `AppState` is an `Arc<Mutex<Inner>>` so it can be cloned cheaply and shared across
-the executor task, the TUI render loop, and the axum web handlers — all running
-concurrently on the tokio runtime.
+the executor task and the TUI render loop — all running concurrently on the tokio
+runtime.
 
 ### Output buffering
 
@@ -352,9 +325,6 @@ reached, so memory is bounded regardless of how verbose the command is.
 - **Path traversal prevention** — strategy and command names are validated before
   being used as path components. Names containing `/`, `\`, `.`, or `..` are
   rejected with an explicit error.
-- **CORS** — the web server does not emit `Access-Control-Allow-Origin` headers.
-  Cross-origin `POST` requests (e.g. from a malicious website) trigger a CORS
-  preflight that the server intentionally does not satisfy, so the browser blocks them.
 - **Shell injection** — all arguments are passed via `.arg()` to `tokio::process::Command`,
   never interpolated into a shell string, so paths with spaces or special characters
   are handled safely.
@@ -399,9 +369,6 @@ moldx/
 │   └── ui/
 │       ├── mod.rs       UI module
 │       ├── tui.rs       Ratatui terminal UI
-│       ├── web.rs       Axum web server
-│       └── static/
-│           └── index.html  Compiled-in single-page app
 ├── playground/
 │   ├── .moldx/
 │   │   ├── detector.sh
@@ -430,11 +397,10 @@ moldx/
 |-------|---------|
 | `clap` | CLI parsing with derive macros and env-var support |
 | `tokio` | Async runtime for concurrent process execution |
-| `axum` | Web server for the browser UI |
 | `ratatui` + `crossterm` | Terminal UI rendering and input |
 | `walkdir` | Recursive directory traversal |
 | `anyhow` | Ergonomic error propagation |
-| `serde` + `serde_json` | JSON serialisation for the web API |
+| `serde` + `serde_json` | JSON serialisation |
 
 ---
 
@@ -445,9 +411,6 @@ The `playground/` directory is a fully-wired moldx project you can use immediate
 ```bash
 # Terminal UI
 MOLDX_DIR=$PWD/playground/.moldx cargo run -- ui
-
-# Web UI  (then open http://localhost:8080)
-MOLDX_DIR=$PWD/playground/.moldx cargo run -- serve
 
 # CLI commands
 MOLDX_DIR=$PWD/playground/.moldx cargo run -- docker build playground/modules/auth-service

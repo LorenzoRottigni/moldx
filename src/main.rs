@@ -35,16 +35,6 @@ async fn main() -> Result<()> {
             ui::tui::run(cfg, state).await?;
         }
 
-        Commands::Serve { port } => {
-            let cfg = config::MoldxConfig::resolve(
-                &std::env::current_dir()?,
-                moldx_dir_override,
-                commands_dir_override,
-            )?;
-            let state = AppState::with_persistence(cfg.state_file_path.clone());
-            ui::web::run(cfg, port, state).await?;
-        }
-
         Commands::Detect { path } => {
             let abs = canonicalize_or_err(&path)?;
             let cfg =

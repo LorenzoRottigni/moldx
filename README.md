@@ -4,7 +4,7 @@
 management through user-defined shell-based strategies.
 
 Unlike Nx, Lerna, or Turborepo — which are JavaScript-first — moldx is built around
-plain shell scripts and a project-specific detector, so it works equally well for
+plain shell scripts and a project-specific probe, so it works equally well for
 Rust services, Docker containers, Python packages, Go binaries, and anything else
 that can be driven by a shell command.
 
@@ -37,10 +37,10 @@ curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.
 cargo build --release
 
 # 2. Bootstrap your project
-mkdir -p .moldx/commands/build
+mkdir -p .moldx/bin/build
 
-# 3. Write detector.sh — prints one strategy name per line
-cat > .moldx/detector.sh <<'EOF'
+# 3. Write probe.sh — prints one strategy name per line
+cat > .moldx/probe.sh <<'EOF'
 #!/usr/bin/env bash
 TARGET="$1"
 [ -f "$TARGET/Dockerfile" ]   && echo "docker"
@@ -49,13 +49,13 @@ TARGET="$1"
 EOF
 
 # 4. Write a command script
-cat > .moldx/commands/build/docker.sh <<'EOF'
+cat > .moldx/bin/build/docker.sh <<'EOF'
 #!/usr/bin/env bash
 echo "Building $1..."
 EOF
 
 # 4b. Optional strategy-agnostic command
-cat > .moldx/commands/diff.sh <<'EOF'
+cat > .moldx/bin/diff.sh <<'EOF'
 #!/usr/bin/env bash
 echo "Diff for $1"
 EOF
@@ -72,12 +72,12 @@ moldx diff ./services/my-service           # strategy-agnostic command
 
 | Term | Description |
 |------|-------------|
-| **Module** | Any directory in your project that `detector.sh` recognises as workable |
+| **Module** | Any directory in your project that `probe.sh` recognises as workable |
 | **Strategy** | A named technology category (e.g. `docker`, `node`, `rust`). One module can have multiple strategies |
-| **Command** | A named operation defined as a shell script under `.moldx/commands/` (e.g. `build`, `deploy`, `test`) |
-| **Detector** | `.moldx/detector.sh` — receives an absolute module path as `$1`, prints zero or more strategy names |
+| **Command** | A named operation defined as a shell script under `.moldx/bin/` (e.g. `build`, `deploy`, `test`) |
+| **Probe** | `.moldx/probe.sh` — receives an absolute module path as `$1`, prints zero or more strategy names |
 
-A module is eligible for a strategy when `detector.sh` prints that strategy's name for
+A module is eligible for a strategy when `probe.sh` prints that strategy's name for
 that path. A command is available when the corresponding `.sh` file exists inside the
 command directory (either as agnostic command or strategy variant).
 
@@ -90,14 +90,14 @@ Create a `.moldx/` directory at the root of your project:
 ```
 <project-root>/
   .moldx/
-    detector.sh                  ← prints strategy names to stdout
-    commands/
+    probe.sh                     ← prints strategy names to stdout
+    bin/
       <command>.sh               ← strategy-agnostic command
       <command>/
         <strategy>.sh            ← strategy-specific variant
 ```
 
-### detector.sh contract
+### probe.sh contract
 
 - Receives the **absolute path** of the module being tested as `$1`
 - Prints **one strategy name per line** to stdout for every matching strategy
@@ -115,8 +115,8 @@ TARGET="$1"
 ### Command script contract
 
 - Located at one of:
-  - `.moldx/commands/<command>.sh` (strategy-agnostic)
-  - `.moldx/commands/<command>/<strategy>.sh` (strategy variant)
+  - `.moldx/bin/<command>.sh` (strategy-agnostic)
+  - `.moldx/bin/<command>/<strategy>.sh` (strategy variant)
 - Receives the **absolute module path** as `$1`
 - Exit code is forwarded to the caller unchanged
 
@@ -132,9 +132,9 @@ docker build -t my-image "$MODULE_PATH"
 | Method | Overrides |
 |--------|-----------|
 | `--moldx-dir <path>` | Location of the `.moldx/` directory |
-| `--commands-dir <path>` | Location of the `commands/` directory |
+| `--bin-dir <path>` | Location of the `bin/` directory |
 | `MOLDX_DIR=<path>` env var | Same as `--moldx-dir` |
-| `MOLDX_COMMANDS_DIR=<path>` env var | Same as `--commands-dir` |
+| `MOLDX_BIN_DIR=<path>` env var | Same as `--bin-dir` |
 
 ---
 
@@ -149,7 +149,7 @@ moldx [OPTIONS] <COMMAND>
 | Flag | Env var | Description |
 |------|---------|-------------|
 | `--moldx-dir <dir>` | `MOLDX_DIR` | Override `.moldx/` directory location |
-| `--commands-dir <dir>` | `MOLDX_COMMANDS_DIR` | Override commands directory |
+| `--bin-dir <dir>` | `MOLDX_BIN_DIR` | Override bin directory |
 
 ### Subcommands
 
@@ -170,7 +170,7 @@ Validation sequence:
 1. Path is canonicalized — error if it does not exist
 2. `.moldx/` directory is located (walks up from the module path)
 3. Strategy and command names are validated against path traversal
-4. `detector.sh` is called to discover strategy variants for this module
+4. `probe.sh` is called to discover strategy variants for this module
 5. Strategy resolution is performed (explicit strategy, then detected variants, then agnostic)
 6. Script existence is checked — error with available variants listed
 7. Script is executed with inherited stdio; exit code is forwarded
@@ -244,30 +244,30 @@ upward from the given path (similar to how `git` finds `.git/`) until it finds a
 ```
 root            — directory containing .moldx/
 moldx_dir       — .moldx/ itself
-detector_path   — .moldx/detector.sh
-commands_dir    — .moldx/commands/
+probe_path      — .moldx/probe.sh
+bin_dir         — .moldx/bin/
 ```
 
 If `MOLDX_DIR` is set, the upward walk is skipped entirely.
 
 ### Strategy detection
 
-`detect_strategies(detector_path, target)` runs:
+`detect_strategies(probe_path, target)` runs:
 
 ```bash
-bash .moldx/detector.sh <absolute-target-path>
+bash .moldx/probe.sh <absolute-target-path>
 ```
 
 under a **10-second timeout**. Every non-empty trimmed line of stdout is returned as a
 strategy name. A non-zero exit code returns an empty list without error — this allows
-the detector to simply not print anything for paths it doesn't recognise.
+the probe to simply not print anything for paths it doesn't recognise.
 
 ### Module discovery (`moldx list` / UI scan)
 
 `discover_modules` walks the directory tree with `walkdir` (respecting `max_depth`),
 skips hidden directories and known build artefact folders (`target`, `node_modules`),
 then calls `detect_strategies` on every candidate directory **in parallel** using a
-`tokio::task::JoinSet` bounded by a `Semaphore(8)` — so at most 8 detector processes
+`tokio::task::JoinSet` bounded by a `Semaphore(8)` — so at most 8 probe processes
 run concurrently regardless of repo size.
 
 ```
@@ -285,8 +285,8 @@ bash <resolved-script> <abs-module-path>
 ```
 
 where `<resolved-script>` is either:
-- `.moldx/commands/<command>/<strategy>.sh`
-- `.moldx/commands/<command>.sh`
+- `.moldx/bin/<command>/<strategy>.sh`
+- `.moldx/bin/<command>.sh`
 
 - stdio is **inherited** from moldx — output streams directly to the terminal
 - the script's **exact exit code is forwarded** to the caller via `std::process::exit`
@@ -364,7 +364,7 @@ moldx/
 │   ├── main.rs          Entry point and CLI dispatch
 │   ├── cli.rs           Clap argument definitions
 │   ├── config.rs        .moldx/ discovery and MoldxConfig
-│   ├── detector.rs      detect_strategies + discover_modules
+│   ├── probe.rs         detect_strategies + discover_modules
 │   ├── executor.rs      execute_blocking + run_and_track
 │   ├── state.rs         AppState (process registry)
 │   └── ui/
@@ -372,8 +372,8 @@ moldx/
 │       ├── tui.rs       Ratatui terminal UI
 ├── playground/
 │   ├── .moldx/
-│   │   ├── detector.sh
-│   │   └── commands/
+│   │   ├── probe.sh
+│   │   └── bin/
 │   │       ├── build/   docker.sh node.sh rust.sh
 │   │       ├── deploy/  docker.sh
 │   │       ├── diff.sh  strategy-agnostic
@@ -447,7 +447,6 @@ cargo build --release
 | Suite | Count | What it covers |
 |-------|-------|----------------|
 | Unit — `config` | 5 | `.moldx/` discovery, override precedence |
-| Unit — `detector` | 8 | Script parsing, timeout, empty/error cases, command listing |
+| Unit — `probe` | 8 | Script parsing, timeout, empty/error cases, command listing |
 | Unit — `state` | 12 | Process lifecycle, output buffer bounds, Arc sharing |
 | E2E | 18 | Full binary invocation: detect, list, run, error cases, optional strategy |
-

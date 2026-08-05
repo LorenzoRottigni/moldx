@@ -5,7 +5,7 @@
 //! that the `.moldx/` directory is guaranteed to exist.
 mod cli;
 mod config;
-mod detector;
+mod probe;
 mod executor;
 mod state;
 mod ui;
@@ -13,7 +13,7 @@ mod ui;
 use anyhow::{Result, bail};
 use clap::Parser;
 use cli::{Cli, Commands};
-use detector::AGNOSTIC_STRATEGY;
+use probe::AGNOSTIC_STRATEGY;
 use state::AppState;
 use std::path::PathBuf;
 
@@ -22,14 +22,14 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let moldx_dir_override = cli.moldx_dir.as_deref().map(std::path::Path::new);
-    let commands_dir_override = cli.commands_dir.as_deref().map(std::path::Path::new);
+    let bin_dir_override = cli.bin_dir.as_deref().map(std::path::Path::new);
 
     match cli.command.unwrap_or(Commands::Ui) {
         Commands::Ui => {
             let cfg = config::MoldxConfig::resolve(
                 &std::env::current_dir()?,
                 moldx_dir_override,
-                commands_dir_override,
+                bin_dir_override,
             )?;
             let state = AppState::new();
             ui::tui::run(cfg, state).await?;
@@ -38,8 +38,8 @@ async fn main() -> Result<()> {
         Commands::Detect { path } => {
             let abs = canonicalize_or_err(&path)?;
             let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, commands_dir_override)?;
-            let strategies = detector::detect_strategies(&cfg.detector_path, &abs).await?;
+                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
+            let strategies = probe::detect_strategies(&cfg.probe_path, &abs).await?;
             if strategies.is_empty() {
                 println!("No strategies detected for {}", abs.display());
             } else {
@@ -56,8 +56,8 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|| std::env::current_dir().map_err(anyhow::Error::from))?;
             let abs = canonicalize_or_err(&root)?;
             let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, commands_dir_override)?;
-            let modules = detector::discover_modules(&abs, &cfg, depth).await?;
+                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
+            let modules = probe::discover_modules(&abs, &cfg, depth).await?;
             if modules.is_empty() {
                 println!("No modules found under {}", abs.display());
             } else {
@@ -96,14 +96,14 @@ async fn main() -> Result<()> {
             let abs = canonicalize_or_err(&path)?;
 
             let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, commands_dir_override)?;
+                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
 
             validate_name(&command, "command")?;
             if let Some(ref hint) = strategy_hint {
                 validate_name(hint, "strategy")?;
             }
 
-            let detected = detector::detect_strategies(&cfg.detector_path, &abs).await?;
+            let detected = probe::detect_strategies(&cfg.probe_path, &abs).await?;
 
             let (script, _strategy_label) = if let Some(hint) = strategy_hint {
                 if !detected.is_empty() && !detected.iter().any(|s| s == &hint) {
@@ -119,10 +119,9 @@ async fn main() -> Result<()> {
                     );
                 }
 
-                let variant_script = cfg.commands_dir.join(&command).join(format!("{}.sh", hint));
+                let variant_script = cfg.bin_dir.join(&command).join(format!("{}.sh", hint));
                 if !variant_script.exists() {
-                    let available =
-                        detector::available_strategies_for_command(&cfg.commands_dir, &command);
+                    let available = probe::available_strategies_for_command(&cfg.bin_dir, &command);
                     bail!(
                         "Command '{}' has no '{}' variant.\nAvailable strategies for this command: {}",
                         command,
@@ -136,11 +135,11 @@ async fn main() -> Result<()> {
                 }
                 (variant_script, hint)
             } else {
-                // Try detected strategy variants first (detector order), then fall back to agnostic.
+                // Try detected strategy variants first (probe order), then fall back to agnostic.
                 let mut selected: Option<(PathBuf, String)> = None;
                 for strategy in &detected {
                     let variant_script = cfg
-                        .commands_dir
+                        .bin_dir
                         .join(&command)
                         .join(format!("{}.sh", strategy));
                     if variant_script.exists() {
@@ -152,14 +151,14 @@ async fn main() -> Result<()> {
                 if let Some(found) = selected {
                     found
                 } else {
-                    let agnostic_script = cfg.commands_dir.join(format!("{}.sh", command));
+                    let agnostic_script = cfg.bin_dir.join(format!("{}.sh", command));
                     if agnostic_script.exists() {
                         (agnostic_script, AGNOSTIC_STRATEGY.to_string())
                     } else {
                         let available_variants =
-                            detector::available_strategies_for_command(&cfg.commands_dir, &command);
+                            probe::available_strategies_for_command(&cfg.bin_dir, &command);
                         let available_agnostic =
-                            detector::has_agnostic_command(&cfg.commands_dir, &command);
+                            probe::has_agnostic_command(&cfg.bin_dir, &command);
                         if !available_variants.is_empty() && detected.is_empty() {
                             bail!(
                                 "Command '{}' requires a strategy variant, but no strategies were detected for {}.\nAvailable variants: {}",
@@ -206,8 +205,8 @@ fn canonicalize_or_err(path: &std::path::Path) -> Result<PathBuf> {
 /// Reject names that contain path separators or are relative references.
 ///
 /// Strategy and command names must be plain identifiers so that
-/// `commands_dir.join(command).join(strategy)` cannot escape the
-/// commands directory via sequences like `../../etc`.
+/// `bin_dir.join(command).join(strategy)` cannot escape the bin directory via
+/// sequences like `../../etc`.
 fn validate_name(name: &str, kind: &str) -> Result<()> {
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
         bail!(

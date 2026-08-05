@@ -1,9 +1,9 @@
 //! CLI argument definitions for moldx.
 //!
 //! Built with [clap](https://docs.rs/clap). Global options (`--moldx-dir`,
-//! `--commands-dir`) are also readable from the `MOLDX_DIR` and
-//! `MOLDX_COMMANDS_DIR` environment variables so they can be set once in a
-//! shell profile for a project-wide override.
+//! `--bin-dir`) are also readable from the `MOLDX_DIR` and `MOLDX_BIN_DIR`
+//! environment variables so they can be set once in a shell profile for a
+//! project-wide override.
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -19,9 +19,9 @@ pub struct Cli {
     #[arg(long, env = "MOLDX_DIR", global = true)]
     pub moldx_dir: Option<String>,
 
-    /// Override the commands directory location (or set MOLDX_COMMANDS_DIR env var)
-    #[arg(long, env = "MOLDX_COMMANDS_DIR", global = true)]
-    pub commands_dir: Option<String>,
+    /// Override the bin directory location (or set MOLDX_BIN_DIR env var)
+    #[arg(long, env = "MOLDX_BIN_DIR", global = true)]
+    pub bin_dir: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,

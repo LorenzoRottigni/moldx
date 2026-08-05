@@ -227,6 +227,25 @@ impl AppState {
         }
         self.update_status(id, ProcessStatus::Killed);
     }
+
+    /// Kill every process that is currently marked as running.
+    ///
+    /// This is used by the TUI shutdown path so closing the interface leaves
+    /// no tracked child processes behind.
+    pub fn kill_all_running(&self) {
+        let running_ids: Vec<u64> = {
+            let g = self.inner.lock().unwrap();
+            g.processes
+                .iter()
+                .filter(|p| p.status.is_running())
+                .map(|p| p.id)
+                .collect()
+        };
+
+        for id in running_ids {
+            self.kill_process(id);
+        }
+    }
 }
 
 #[cfg(test)]

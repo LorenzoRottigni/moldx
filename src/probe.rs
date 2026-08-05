@@ -2,7 +2,7 @@
 //!
 //! The public surface is four functions:
 //!
-//! * [`detect_strategies`] — run `detector.sh` against a single path and
+//! * [`detect_strategies`] — run `probe.sh` against a single path and
 //!   return the list of strategy names it prints (one per line).
 //! * [`available_commands`] — list command names available for a given strategy.
 //! * [`available_strategies_for_command`] — list strategy variants available for
@@ -25,7 +25,7 @@ use crate::config::MoldxConfig;
 /// Synthetic strategy label used for strategy-agnostic commands.
 pub const AGNOSTIC_STRATEGY: &str = "agnostic";
 
-/// A module is a directory that [`detector.sh`] recognises as belonging to at
+/// A module is a directory that [`probe.sh`] recognises as belonging to at
 /// least one strategy.
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -37,30 +37,30 @@ pub struct Module {
     pub strategies: HashMap<String, Vec<String>>,
 }
 
-/// Hard ceiling on how long a single `detector.sh` invocation may take.
-const DETECTOR_TIMEOUT: Duration = Duration::from_secs(10);
+/// Hard ceiling on how long a single `probe.sh` invocation may take.
+const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Run `detector.sh` against `target` and return the strategy names it prints.
+/// Run `probe.sh` against `target` and return the strategy names it prints.
 ///
-/// The script is invoked as `bash <detector_path> <target>` and is given
+/// The script is invoked as `bash <probe_path> <target>` and is given
 /// [`DETECTOR_TIMEOUT`] to complete. Each non-empty trimmed line of stdout
 /// is treated as a strategy name. A non-zero exit code is treated as "no
 /// strategies detected" rather than an error so that modules that simply do
 /// not match any strategy are silently skipped during bulk discovery.
-pub async fn detect_strategies(detector_path: &Path, target: &Path) -> Result<Vec<String>> {
-    if !detector_path.exists() {
-        anyhow::bail!("Detector script not found: {}", detector_path.display());
+pub async fn detect_strategies(probe_path: &Path, target: &Path) -> Result<Vec<String>> {
+    if !probe_path.exists() {
+        anyhow::bail!("Probe script not found: {}", probe_path.display());
     }
 
     let output = timeout(
-        DETECTOR_TIMEOUT,
-        Command::new("bash").arg(detector_path).arg(target).output(),
+        PROBE_TIMEOUT,
+        Command::new("bash").arg(probe_path).arg(target).output(),
     )
     .await
     .map_err(|_| {
         anyhow::anyhow!(
-            "detector.sh timed out after {}s",
-            DETECTOR_TIMEOUT.as_secs()
+            "probe.sh timed out after {}s",
+            PROBE_TIMEOUT.as_secs()
         )
     })??;
 
@@ -79,14 +79,14 @@ pub async fn detect_strategies(detector_path: &Path, target: &Path) -> Result<Ve
 /// Return the sorted list of command names available for `strategy`.
 ///
 /// Layout supported:
-/// - `.moldx/commands/<command>.sh` (strategy-agnostic)
-/// - `.moldx/commands/<command>/<strategy>.sh` (strategy-specific)
-pub fn available_commands(commands_dir: &Path, strategy: &str) -> Vec<String> {
+/// - `.moldx/bin/<command>.sh` (strategy-agnostic)
+/// - `.moldx/bin/<command>/<strategy>.sh` (strategy-specific)
+pub fn available_commands(bin_dir: &Path, strategy: &str) -> Vec<String> {
     if strategy == AGNOSTIC_STRATEGY {
-        return available_agnostic_commands(commands_dir);
+        return available_agnostic_commands(bin_dir);
     }
 
-    let mut commands: Vec<String> = std::fs::read_dir(commands_dir)
+    let mut commands: Vec<String> = std::fs::read_dir(bin_dir)
         .into_iter()
         .flatten()
         .flatten()
@@ -113,8 +113,8 @@ pub fn available_commands(commands_dir: &Path, strategy: &str) -> Vec<String> {
 ///
 /// Only strategy-specific variants are returned. Strategy-agnostic availability
 /// can be checked with [`has_agnostic_command`].
-pub fn available_strategies_for_command(commands_dir: &Path, command: &str) -> Vec<String> {
-    let command_dir = commands_dir.join(command);
+pub fn available_strategies_for_command(bin_dir: &Path, command: &str) -> Vec<String> {
+    let command_dir = bin_dir.join(command);
     if !command_dir.is_dir() {
         return vec![];
     }
@@ -137,13 +137,13 @@ pub fn available_strategies_for_command(commands_dir: &Path, command: &str) -> V
     strategies
 }
 
-/// Return true if `.moldx/commands/<command>.sh` exists.
-pub fn has_agnostic_command(commands_dir: &Path, command: &str) -> bool {
-    commands_dir.join(format!("{}.sh", command)).is_file()
+/// Return true if `.moldx/bin/<command>.sh` exists.
+pub fn has_agnostic_command(bin_dir: &Path, command: &str) -> bool {
+    bin_dir.join(format!("{}.sh", command)).is_file()
 }
 
-fn available_agnostic_commands(commands_dir: &Path) -> Vec<String> {
-    let mut commands: Vec<String> = std::fs::read_dir(commands_dir)
+fn available_agnostic_commands(bin_dir: &Path) -> Vec<String> {
+    let mut commands: Vec<String> = std::fs::read_dir(bin_dir)
         .into_iter()
         .flatten()
         .flatten()
@@ -162,7 +162,7 @@ fn available_agnostic_commands(commands_dir: &Path) -> Vec<String> {
 }
 
 /// Walk `root` up to `max_depth` directory levels and return every directory
-/// whose detector invocation emits at least one strategy name and that has at
+/// whose probe invocation emits at least one strategy name and that has at
 /// least one runnable command for either a detected strategy or agnostic mode.
 ///
 /// Directories whose names start with `.`, or equal `target` / `node_modules`,
@@ -186,15 +186,15 @@ pub async fn discover_modules(
         .map(|e| e.into_path())
         .collect();
 
-    let detector_path = Arc::new(config.detector_path.clone());
-    let commands_dir = Arc::new(config.commands_dir.clone());
-    // Limit to 8 concurrent detector.sh invocations
+    let probe_path = Arc::new(config.probe_path.clone());
+    let bin_dir = Arc::new(config.bin_dir.clone());
+    // Limit to 8 concurrent probe.sh invocations
     let semaphore = Arc::new(Semaphore::new(8));
     let mut join_set = JoinSet::new();
 
     for path in entries {
-        let detector_path = detector_path.clone();
-        let commands_dir = commands_dir.clone();
+        let probe_path = probe_path.clone();
+        let bin_dir = bin_dir.clone();
         let semaphore = semaphore.clone();
 
         join_set.spawn(async move {
@@ -203,7 +203,7 @@ pub async fn discover_modules(
                 .acquire()
                 .await
                 .unwrap_or_else(|_| unreachable!("semaphore closed"));
-            let detected = detect_strategies(&detector_path, &path)
+            let detected = detect_strategies(&probe_path, &path)
                 .await
                 .unwrap_or_default();
             if detected.is_empty() {
@@ -212,13 +212,13 @@ pub async fn discover_modules(
 
             let mut strategy_map: HashMap<String, Vec<String>> = HashMap::new();
 
-            let agnostic = available_commands(&commands_dir, AGNOSTIC_STRATEGY);
+            let agnostic = available_commands(&bin_dir, AGNOSTIC_STRATEGY);
             if !agnostic.is_empty() {
                 strategy_map.insert(AGNOSTIC_STRATEGY.to_string(), agnostic);
             }
 
             for strategy in detected {
-                let commands = available_commands(&commands_dir, &strategy);
+                let commands = available_commands(&bin_dir, &strategy);
                 if !commands.is_empty() {
                     strategy_map.insert(strategy, commands);
                 }
@@ -314,47 +314,47 @@ mod tests {
     #[tokio::test]
     async fn detect_strategies_parses_script_output() {
         let tmp = TempDir::new().unwrap();
-        let detector = tmp.path().join("detector.sh");
-        std::fs::write(&detector, "#!/usr/bin/env bash\necho alpha\necho beta\n").unwrap();
+        let probe = tmp.path().join("probe.sh");
+        std::fs::write(&probe, "#!/usr/bin/env bash\necho alpha\necho beta\n").unwrap();
 
-        let result = detect_strategies(&detector, tmp.path()).await.unwrap();
+        let result = detect_strategies(&probe, tmp.path()).await.unwrap();
         assert_eq!(result, vec!["alpha", "beta"]);
     }
 
     #[tokio::test]
     async fn detect_strategies_returns_empty_on_no_output() {
         let tmp = TempDir::new().unwrap();
-        let detector = tmp.path().join("detector.sh");
-        std::fs::write(&detector, "#!/usr/bin/env bash\nexit 0\n").unwrap();
+        let probe = tmp.path().join("probe.sh");
+        std::fs::write(&probe, "#!/usr/bin/env bash\nexit 0\n").unwrap();
 
-        let result = detect_strategies(&detector, tmp.path()).await.unwrap();
+        let result = detect_strategies(&probe, tmp.path()).await.unwrap();
         assert!(result.is_empty());
     }
 
     #[tokio::test]
     async fn detect_strategies_returns_empty_on_script_failure() {
         let tmp = TempDir::new().unwrap();
-        let detector = tmp.path().join("detector.sh");
-        std::fs::write(&detector, "#!/usr/bin/env bash\nexit 1\n").unwrap();
+        let probe = tmp.path().join("probe.sh");
+        std::fs::write(&probe, "#!/usr/bin/env bash\nexit 1\n").unwrap();
 
-        let result = detect_strategies(&detector, tmp.path()).await.unwrap();
+        let result = detect_strategies(&probe, tmp.path()).await.unwrap();
         assert!(result.is_empty());
     }
 
     #[tokio::test]
     async fn detect_strategies_trims_whitespace() {
         let tmp = TempDir::new().unwrap();
-        let detector = tmp.path().join("detector.sh");
-        std::fs::write(&detector, "#!/usr/bin/env bash\necho '  docker  '\n").unwrap();
+        let probe = tmp.path().join("probe.sh");
+        std::fs::write(&probe, "#!/usr/bin/env bash\necho '  docker  '\n").unwrap();
 
-        let result = detect_strategies(&detector, tmp.path()).await.unwrap();
+        let result = detect_strategies(&probe, tmp.path()).await.unwrap();
         assert_eq!(result, vec!["docker"]);
     }
 
     #[tokio::test]
-    async fn detect_strategies_errors_when_no_detector() {
+    async fn detect_strategies_errors_when_no_probe() {
         let result = detect_strategies(
-            std::path::Path::new("/nonexistent/detector.sh"),
+            std::path::Path::new("/nonexistent/probe.sh"),
             std::path::Path::new("/tmp"),
         )
         .await;

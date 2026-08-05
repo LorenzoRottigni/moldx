@@ -44,8 +44,8 @@ use tokio::sync::oneshot;
 
 use crate::{
     config::MoldxConfig,
-    detector::{self, AGNOSTIC_STRATEGY, Module},
     executor,
+    probe::{self, AGNOSTIC_STRATEGY, Module},
     state::AppState,
 };
 
@@ -145,7 +145,7 @@ impl TuiApp {
         self.refresh_rx = Some(rx);
         let config = self.config.clone();
         tokio::spawn(async move {
-            let result = detector::discover_modules(&config.root, &config, 3).await;
+            let result = probe::discover_modules(&config.root, &config, 3).await;
             let _ = tx.send(result);
         });
     }
@@ -186,10 +186,10 @@ impl TuiApp {
             None => return,
         };
         let script = if strategy == AGNOSTIC_STRATEGY {
-            self.config.commands_dir.join(format!("{}.sh", command))
+            self.config.bin_dir.join(format!("{}.sh", command))
         } else {
             self.config
-                .commands_dir
+                .bin_dir
                 .join(&command)
                 .join(format!("{}.sh", strategy))
         };
@@ -633,7 +633,7 @@ pub async fn run(config: MoldxConfig, state: AppState) -> Result<()> {
     let config = Arc::new(config);
 
     eprintln!("Scanning modules (this may take a moment)…");
-    let modules = detector::discover_modules(&config.root, &config, 3).await?;
+    let modules = probe::discover_modules(&config.root, &config, 3).await?;
     eprintln!("Found {} module(s).", modules.len());
 
     let mut app = TuiApp::new(config, modules, state);
@@ -659,6 +659,7 @@ pub async fn run(config: MoldxConfig, state: AppState) -> Result<()> {
         }
     }
 
+    app.state.kill_all_running();
     restore_terminal(&mut terminal)?;
     Ok(())
 }

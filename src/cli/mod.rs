@@ -4,6 +4,9 @@
 //! `--bin-dir`) are also readable from the `MOLDX_DIR` and `MOLDX_BIN_DIR`
 //! environment variables so they can be set once in a shell profile for a
 //! project-wide override.
+
+pub mod commands;
+
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 

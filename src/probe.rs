@@ -173,6 +173,10 @@ pub async fn discover_modules(
     config: &MoldxConfig,
     max_depth: usize,
 ) -> Result<Vec<Module>> {
+    if !config.probe_path.exists() {
+        anyhow::bail!("Probe script not found: {}", config.probe_path.display());
+    }
+
     let entries: Vec<PathBuf> = WalkDir::new(root)
         .max_depth(max_depth)
         .follow_links(false)
@@ -203,11 +207,9 @@ pub async fn discover_modules(
                 .acquire()
                 .await
                 .unwrap_or_else(|_| unreachable!("semaphore closed"));
-            let detected = detect_strategies(&probe_path, &path)
-                .await
-                .unwrap_or_default();
+            let detected = detect_strategies(&probe_path, &path).await?;
             if detected.is_empty() {
-                return None;
+                return Ok::<_, anyhow::Error>(None);
             }
 
             let mut strategy_map: HashMap<String, Vec<String>> = HashMap::new();
@@ -225,20 +227,23 @@ pub async fn discover_modules(
             }
 
             if strategy_map.is_empty() {
-                None
+                Ok(None)
             } else {
-                Some(Module {
+                Ok(Some(Module {
                     path,
                     strategies: strategy_map,
-                })
+                }))
             }
         });
     }
 
     let mut modules = Vec::new();
     while let Some(result) = join_set.join_next().await {
-        if let Ok(Some(module)) = result {
-            modules.push(module);
+        match result {
+            Ok(Ok(Some(module))) => modules.push(module),
+            Ok(Ok(None)) => {}
+            Ok(Err(error)) => return Err(error),
+            Err(error) => return Err(error.into()),
         }
     }
     modules.sort_by(|a, b| a.path.cmp(&b.path));
@@ -358,6 +363,17 @@ mod tests {
             std::path::Path::new("/tmp"),
         )
         .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn discover_modules_surfaces_probe_errors() {
+        let tmp = TempDir::new().unwrap();
+        let moldx = tmp.path().join(".moldx");
+        std::fs::create_dir(&moldx).unwrap();
+        let cfg = crate::config::MoldxConfig::resolve(tmp.path(), Some(&moldx), None).unwrap();
+
+        let result = discover_modules(tmp.path(), &cfg, 1).await;
         assert!(result.is_err());
     }
 }

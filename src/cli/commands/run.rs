@@ -29,7 +29,7 @@ pub async fn run(
             PathBuf::from(&args[2]),
         )
     };
-    let abs = &path
+    let abs = path
         .canonicalize()
         .map_err(|_| anyhow::anyhow!("Path does not exist: {}", path.display()))?;
 

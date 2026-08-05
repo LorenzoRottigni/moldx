@@ -41,6 +41,8 @@ use ratatui::{
 };
 use std::{io, sync::Arc, time::Duration};
 use tokio::sync::oneshot;
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
 
 use crate::{
     config::MoldxConfig,
@@ -51,6 +53,37 @@ pub mod executor;
 pub mod state;
 
 use state::AppState;
+
+struct TuiSession {
+    terminal: Option<Terminal<CrosstermBackend<io::Stdout>>>,
+    state: AppState,
+}
+
+impl TuiSession {
+    fn new(terminal: Terminal<CrosstermBackend<io::Stdout>>, state: AppState) -> Self {
+        Self {
+            terminal: Some(terminal),
+            state,
+        }
+    }
+
+    fn terminal_mut(&mut self) -> Option<&mut Terminal<CrosstermBackend<io::Stdout>>> {
+        self.terminal.as_mut()
+    }
+
+    fn cleanup(&mut self) {
+        self.state.kill_all_running();
+        if let Some(mut terminal) = self.terminal.take() {
+            let _ = restore_terminal(&mut terminal);
+        }
+    }
+}
+
+impl Drop for TuiSession {
+    fn drop(&mut self) {
+        self.cleanup();
+    }
+}
 
 /// Which of the three side-by-side panels currently has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -317,6 +350,32 @@ fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Re
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     Ok(())
+}
+
+async fn wait_for_shutdown_signal() {
+    #[cfg(unix)]
+    {
+        let mut sigterm = match signal(SignalKind::terminate()) {
+            Ok(signal) => signal,
+            Err(_) => {
+                let _ = tokio::signal::ctrl_c().await;
+                return;
+            }
+        };
+
+        let ctrl_c = tokio::signal::ctrl_c();
+        tokio::pin!(ctrl_c);
+
+        tokio::select! {
+            _ = &mut ctrl_c => {},
+            _ = sigterm.recv() => {},
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
@@ -640,14 +699,19 @@ pub async fn run(config: MoldxConfig) -> Result<()> {
     eprintln!("Found {} module(s).", modules.len());
 
     let state = AppState::new();
+    let mut session = TuiSession::new(setup_terminal()?, state.clone());
     let mut app = TuiApp::new(config, modules, state);
 
-    let mut terminal = setup_terminal()?;
     let mut events = EventStream::new();
     let mut tick = tokio::time::interval(Duration::from_millis(500));
 
     loop {
-        terminal.draw(|f| draw(f, &mut app))?;
+        {
+            let terminal = session
+                .terminal_mut()
+                .expect("terminal should remain available during TUI run");
+            terminal.draw(|f| draw(f, &mut app))?;
+        }
 
         tokio::select! {
             _ = tick.tick() => {
@@ -660,10 +724,10 @@ pub async fn run(config: MoldxConfig) -> Result<()> {
                     _ => {}
                 }
             }
+            _ = wait_for_shutdown_signal() => break,
         }
     }
 
-    app.state.kill_all_running();
-    restore_terminal(&mut terminal)?;
+    session.cleanup();
     Ok(())
 }

@@ -110,22 +110,19 @@ impl AppState {
         command: &str,
         pid: Option<u32>,
     ) -> u64 {
-        let id = {
-            let mut g = self.inner.lock().unwrap();
-            let id = g.next_id;
-            g.next_id += 1;
-            g.processes.push(RunningProcess {
-                id,
-                module_path: module_path.to_string(),
-                strategy: strategy.to_string(),
-                command: command.to_string(),
-                pid,
-                started_at: SystemTime::now(),
-                status: ProcessStatus::Running,
-                output_lines: VecDeque::new(),
-            });
-            id
-        };
+        let mut g = self.inner.lock().unwrap();
+        let id = g.next_id;
+        g.next_id += 1;
+        g.processes.push(RunningProcess {
+            id,
+            module_path: module_path.to_string(),
+            strategy: strategy.to_string(),
+            command: command.to_string(),
+            pid,
+            started_at: SystemTime::now(),
+            status: ProcessStatus::Running,
+            output_lines: VecDeque::new(),
+        });
         id
     }
 

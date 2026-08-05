@@ -1,4 +1,5 @@
 pub mod detect;
 pub mod list;
+pub mod init;
 pub mod run;
 pub mod ui;

@@ -37,6 +37,11 @@ async fn main() -> Result<()> {
             commands::list::list(path, depth, moldx_dir_override, bin_dir_override).await?;
         }
 
+        // moldx init
+        Commands::Init => {
+            commands::init::init(moldx_dir_override, bin_dir_override).await?;
+        }
+
         // moldx [strategy] <command> <path>
         Commands::Run(args) => {
             commands::run::run(args, moldx_dir_override, bin_dir_override).await?;

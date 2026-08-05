@@ -52,6 +52,9 @@ pub enum Commands {
         depth: usize,
     },
 
+    /// Create a new .moldx/ template directory in the current working directory
+    Init,
+
     /// Run a command: moldx [strategy] <command> <path>
     /// Strategy is optional; if omitted, the best matching strategy variant is used.
     #[command(external_subcommand)]

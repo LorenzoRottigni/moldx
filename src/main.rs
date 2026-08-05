@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
                 moldx_dir_override,
                 commands_dir_override,
             )?;
-            let state = AppState::with_persistence(cfg.state_file_path.clone());
+            let state = AppState::new();
             ui::tui::run(cfg, state).await?;
         }
 

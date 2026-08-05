@@ -32,8 +32,6 @@ pub struct MoldxConfig {
     pub detector_path: PathBuf,
     /// `.moldx/commands/`
     pub commands_dir: PathBuf,
-    /// `.moldx/.state.json` — cross-session process registry
-    pub state_file_path: PathBuf,
 }
 
 impl MoldxConfig {
@@ -62,14 +60,12 @@ impl MoldxConfig {
             .unwrap_or_else(|| moldx_dir.join("commands"));
 
         let detector_path = moldx_dir.join("detector.sh");
-        let state_file_path = moldx_dir.join(".state.json");
 
         Ok(MoldxConfig {
             root,
             moldx_dir,
             detector_path,
             commands_dir,
-            state_file_path,
         })
     }
 }
@@ -142,7 +138,6 @@ mod tests {
         assert_eq!(cfg.moldx_dir, moldx);
         assert_eq!(cfg.detector_path, moldx.join("detector.sh"));
         assert_eq!(cfg.commands_dir, moldx.join("commands"));
-        assert_eq!(cfg.state_file_path, moldx.join(".state.json"));
     }
 
     #[test]

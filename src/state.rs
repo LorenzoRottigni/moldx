@@ -4,20 +4,7 @@
 //! All public methods acquire the mutex for the minimum time needed — no
 //! `await` points occur while the lock is held, so deadlocks and starvation
 //! are not possible.
-//!
-//! ## State persistence
-//!
-//! When created with [`AppState::with_persistence`], the registry mirrors its
-//! content to `.moldx/.state.json` after each structural change (spawn / exit).
-//! On the next launch the file is read back, each stored PID is checked with
-//! `kill -0`, and processes that are still alive appear in the Running panel
-//! immediately without re-spawning them.  Dead processes are pruned and the
-//! file is rewritten.
-//!
-//! Add `.moldx/.state.json` to your project's `.gitignore`.
-use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
@@ -88,25 +75,6 @@ pub struct ProcessSummary {
     pub status: ProcessStatus,
 }
 
-// ─── Persistence types ────────────────────────────────────────────────────────
-
-/// On-disk snapshot written to `.moldx/.state.json`.
-#[derive(Serialize, Deserialize, Default)]
-struct PersistedState {
-    next_id: u64,
-    /// Only Running processes with a known PID are stored.
-    processes: Vec<PersistedEntry>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct PersistedEntry {
-    id: u64,
-    module_path: String,
-    strategy: String,
-    command: String,
-    pid: u32,
-}
-
 // ─── Internal storage ────────────────────────────────────────────────────────
 
 /// Internal storage; never exposed outside this module.
@@ -121,12 +89,10 @@ struct Inner {
 /// Thread-safe process registry shared between the executor, TUI and web server.
 ///
 /// Cloning an [`AppState`] is `O(1)` — it just increments an `Arc` reference
-/// count.  All clones share the same underlying data and state file.
+/// count.  All clones share the same underlying data.
 #[derive(Clone, Default)]
 pub struct AppState {
     inner: Arc<Mutex<Inner>>,
-    /// Set when persistence is enabled; shared across all clones.
-    state_file: Option<Arc<PathBuf>>,
 }
 
 impl AppState {
@@ -134,92 +100,6 @@ impl AppState {
     #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Create a state that persists running processes to `state_file`.
-    ///
-    /// Existing entries are loaded and their PIDs are checked.  Alive
-    /// processes appear immediately in the Running panel; dead ones are pruned.
-    pub fn with_persistence(state_file: PathBuf) -> Self {
-        let inner = Self::load_from_file(&state_file);
-        let app = AppState {
-            inner: Arc::new(Mutex::new(inner)),
-            state_file: Some(Arc::new(state_file)),
-        };
-        // Write back to prune dead processes from the file
-        app.persist();
-        app
-    }
-
-    fn load_from_file(path: &Path) -> Inner {
-        let content = match std::fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => return Inner::default(),
-        };
-        let persisted: PersistedState = match serde_json::from_str(&content) {
-            Ok(p) => p,
-            Err(_) => return Inner::default(),
-        };
-        let mut inner = Inner {
-            next_id: persisted.next_id,
-            ..Default::default()
-        };
-        for entry in persisted.processes {
-            let alive = is_pid_alive(entry.pid);
-            inner.processes.push(RunningProcess {
-                id: entry.id,
-                module_path: entry.module_path,
-                strategy: entry.strategy,
-                command: entry.command,
-                pid: Some(entry.pid),
-                started_at: SystemTime::now(),
-                // output cannot be recovered across sessions
-                status: if alive {
-                    ProcessStatus::Running
-                } else {
-                    ProcessStatus::Completed(0)
-                },
-                output_lines: VecDeque::new(),
-            });
-        }
-        inner
-    }
-
-    /// Write only Running processes (with a known PID) to the state file.
-    ///
-    /// The mutex is released before any file I/O to avoid holding it during
-    /// potentially blocking syscalls.
-    fn persist(&self) {
-        let Some(ref path) = self.state_file else {
-            return;
-        };
-        let snapshot = {
-            let g = self.inner.lock().unwrap();
-            PersistedState {
-                next_id: g.next_id,
-                processes: g
-                    .processes
-                    .iter()
-                    .filter(|p| p.status.is_running())
-                    .filter_map(|p| {
-                        p.pid.map(|pid| PersistedEntry {
-                            id: p.id,
-                            module_path: p.module_path.clone(),
-                            strategy: p.strategy.clone(),
-                            command: p.command.clone(),
-                            pid,
-                        })
-                    })
-                    .collect(),
-            }
-        }; // lock released here — before file I/O
-
-        let tmp = path.with_extension("json.tmp");
-        if let Ok(json) = serde_json::to_string_pretty(&snapshot)
-            && std::fs::write(&tmp, &json).is_ok()
-        {
-            let _ = std::fs::rename(&tmp, path.as_ref());
-        }
     }
 
     /// Register a new process and return its assigned `id`.
@@ -246,8 +126,6 @@ impl AppState {
             });
             id
         };
-        // Persist after lock is released
-        self.persist();
         id
     }
 
@@ -259,25 +137,15 @@ impl AppState {
                 p.pid = pid;
             }
         }
-        // Save PID so a future session can reconnect to this process
-        self.persist();
     }
 
     /// Transition the process to a terminal or updated status.
     pub fn update_status(&self, id: u64, status: ProcessStatus) {
-        let is_terminal = matches!(
-            &status,
-            ProcessStatus::Completed(_) | ProcessStatus::Failed(_) | ProcessStatus::Killed
-        );
         {
             let mut g = self.inner.lock().unwrap();
             if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
                 p.status = status;
             }
-        }
-        // Remove from the state file when the process is done
-        if is_terminal {
-            self.persist();
         }
     }
 
@@ -358,31 +226,6 @@ impl AppState {
             }
         }
         self.update_status(id, ProcessStatus::Killed);
-    }
-}
-
-/// Check whether a process with the given PID is still alive.
-///
-/// On Linux, `/proc/<pid>` is checked (no subprocess needed).
-/// On other Unix platforms, `kill -0` is used (spawns a subprocess but is
-/// only called at startup when loading the state file).
-fn is_pid_alive(pid: u32) -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        std::path::Path::new(&format!("/proc/{}", pid)).exists()
-    }
-    #[cfg(all(unix, not(target_os = "linux")))]
-    {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .stderr(std::process::Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    }
-    #[cfg(not(unix))]
-    {
-        false
     }
 }
 

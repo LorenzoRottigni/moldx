@@ -42,6 +42,11 @@ async fn main() -> Result<()> {
             commands::init::init(moldx_dir_override, bin_dir_override).await?;
         }
 
+        // moldx new [strategy] <command> | moldx new <command>
+        Commands::New { args } => {
+            commands::new::new(args, moldx_dir_override, bin_dir_override).await?;
+        }
+
         // moldx [strategy] <command> <path>
         Commands::Run(args) => {
             commands::run::run(args, moldx_dir_override, bin_dir_override).await?;

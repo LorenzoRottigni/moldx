@@ -59,4 +59,11 @@ pub enum Commands {
     /// Strategy is optional; if omitted, the best matching strategy variant is used.
     #[command(external_subcommand)]
     Run(Vec<String>),
+
+    /// Scaffold command scripts in .moldx/bin
+    New {
+        /// Arguments: either `<command>` or `<strategy> <command>`
+        #[arg(required = true, num_args = 1..=2)]
+        args: Vec<String>,
+    },
 }

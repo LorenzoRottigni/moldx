@@ -5,12 +5,12 @@
 //! that the `.moldx/` directory is guaranteed to exist.
 mod cli;
 mod config;
-mod probe;
 mod executor;
+mod probe;
 mod state;
-mod ui;
+mod tui;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use clap::Parser;
 use cli::{Cli, Commands};
 use probe::AGNOSTIC_STRATEGY;
@@ -32,13 +32,12 @@ async fn main() -> Result<()> {
                 bin_dir_override,
             )?;
             let state = AppState::new();
-            ui::tui::run(cfg, state).await?;
+            tui::run(cfg, state).await?;
         }
 
         Commands::Detect { path } => {
             let abs = canonicalize_or_err(&path)?;
-            let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
+            let cfg = config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
             let strategies = probe::detect_strategies(&cfg.probe_path, &abs).await?;
             if strategies.is_empty() {
                 println!("No strategies detected for {}", abs.display());
@@ -55,8 +54,7 @@ async fn main() -> Result<()> {
                 .map(Ok)
                 .unwrap_or_else(|| std::env::current_dir().map_err(anyhow::Error::from))?;
             let abs = canonicalize_or_err(&root)?;
-            let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
+            let cfg = config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
             let modules = probe::discover_modules(&abs, &cfg, depth).await?;
             if modules.is_empty() {
                 println!("No modules found under {}", abs.display());
@@ -95,8 +93,7 @@ async fn main() -> Result<()> {
             };
             let abs = canonicalize_or_err(&path)?;
 
-            let cfg =
-                config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
+            let cfg = config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
 
             validate_name(&command, "command")?;
             if let Some(ref hint) = strategy_hint {
@@ -138,10 +135,8 @@ async fn main() -> Result<()> {
                 // Try detected strategy variants first (probe order), then fall back to agnostic.
                 let mut selected: Option<(PathBuf, String)> = None;
                 for strategy in &detected {
-                    let variant_script = cfg
-                        .bin_dir
-                        .join(&command)
-                        .join(format!("{}.sh", strategy));
+                    let variant_script =
+                        cfg.bin_dir.join(&command).join(format!("{}.sh", strategy));
                     if variant_script.exists() {
                         selected = Some((variant_script, strategy.clone()));
                         break;

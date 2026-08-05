@@ -1,4 +1,4 @@
-//! Process registry shared across the executor and TUI.
+//! Process registry used by the TUI runtime.
 //!
 //! [`AppState`] is a cheaply-cloneable handle backed by an `Arc<Mutex<_>>`.
 //! All public methods acquire the mutex for the minimum time needed — no
@@ -86,7 +86,7 @@ struct Inner {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-/// Thread-safe process registry shared between the executor, TUI and web server.
+/// Thread-safe process registry shared across the TUI runtime.
 ///
 /// Cloning an [`AppState`] is `O(1)` — it just increments an `Arc` reference
 /// count.  All clones share the same underlying data.

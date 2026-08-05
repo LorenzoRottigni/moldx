@@ -28,26 +28,29 @@ use anyhow::Result;
 use crossterm::{
     event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures::StreamExt;
 use ratatui::{
-    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    Frame, Terminal,
 };
 use std::{io, sync::Arc, time::Duration};
 use tokio::sync::oneshot;
 
 use crate::{
     config::MoldxConfig,
-    executor,
-    probe::{self, AGNOSTIC_STRATEGY, Module},
-    state::AppState,
+    probe::{self, Module, AGNOSTIC_STRATEGY},
 };
+
+pub mod executor;
+pub mod state;
+
+use state::AppState;
 
 /// Which of the three side-by-side panels currently has keyboard focus.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -621,7 +624,7 @@ fn draw_help(frame: &mut Frame, area: Rect, _app: &TuiApp) {
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-pub async fn run(config: MoldxConfig, state: AppState) -> Result<()> {
+pub async fn run(config: MoldxConfig) -> Result<()> {
     // Install a panic hook that restores the terminal before printing the panic.
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -636,6 +639,7 @@ pub async fn run(config: MoldxConfig, state: AppState) -> Result<()> {
     let modules = probe::discover_modules(&config.root, &config, 3).await?;
     eprintln!("Found {} module(s).", modules.len());
 
+    let state = AppState::new();
     let mut app = TuiApp::new(config, modules, state);
 
     let mut terminal = setup_terminal()?;

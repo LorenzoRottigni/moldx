@@ -7,14 +7,12 @@ mod cli;
 mod config;
 mod executor;
 mod probe;
-mod state;
 mod tui;
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use cli::{Cli, Commands};
 use probe::AGNOSTIC_STRATEGY;
-use state::AppState;
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -31,10 +29,10 @@ async fn main() -> Result<()> {
                 moldx_dir_override,
                 bin_dir_override,
             )?;
-            let state = AppState::new();
-            tui::run(cfg, state).await?;
+            tui::run(cfg).await?;
         }
 
+        // moldx detect <path>
         Commands::Detect { path } => {
             let abs = canonicalize_or_err(&path)?;
             let cfg = config::MoldxConfig::resolve(&abs, moldx_dir_override, bin_dir_override)?;
@@ -49,6 +47,7 @@ async fn main() -> Result<()> {
             }
         }
 
+        // moldx list [<path>] [--depth <depth>]
         Commands::List { path, depth } => {
             let root = path
                 .map(Ok)
@@ -70,7 +69,7 @@ async fn main() -> Result<()> {
             }
         }
 
-        // moldx [strategy] <command> <path>  — strategy is optional.
+        // moldx [strategy] <command> <path>
         Commands::Run(args) => {
             if args.len() < 2 {
                 bail!(

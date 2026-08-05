@@ -365,8 +365,9 @@ moldx/
 │   ├── cli.rs           Clap argument definitions
 │   ├── config.rs        .moldx/ discovery and MoldxConfig
 │   ├── probe.rs         detect_strategies + discover_modules
-│   ├── executor.rs      execute_blocking + run_and_track
-│   ├── state.rs         AppState (process registry)
+│   ├── executor.rs      execute_blocking
+│   ├── tui_executor.rs  run_and_track for the TUI
+│   ├── tui_state.rs     AppState (TUI process registry)
 │   └── ui/
 │       ├── mod.rs       UI module
 │       ├── tui.rs       Ratatui terminal UI

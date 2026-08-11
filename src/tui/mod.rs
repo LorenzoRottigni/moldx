@@ -33,7 +33,7 @@ use crossterm::{
 use futures::StreamExt;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
@@ -436,6 +436,47 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     };
     let block = panel_block(title, active);
 
+    // If there's room, reserve 4 lines at the top of the Modules panel for a
+    // subtle ASCII logo. This keeps the global layout unchanged and doesn't
+    // alter styles of the other panels.
+    let mut content_area = area;
+    if area.height >= 6 {
+        // Reserve 4 lines for the logo and 1 extra line as bottom padding
+        let parts = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(5), Constraint::Min(0)])
+            .split(area);
+
+        // Render each logo line in one of the two colors for clarity.
+        let purple = Color::Rgb(0x8b, 0x00, 0xff);
+        let lime = Color::Rgb(0x74, 0xff, 0x00);
+
+        let raw_lines = vec![
+            "████████████████████████████████",
+            "█▄─▀█▀─▄█─▄▄─█▄─▄███▄─▄▄▀█▄─▀─▄█",
+            "██─█▄█─██─██─██─██▀██─██─██▀─▀██",
+            "▀▄▄▄▀▄▄▄▀▄▄▄▄▀▄▄▄▄▄▀▄▄▄▄▀▀▄▄█▄▄▀",
+        ];
+
+        let mut styled_lines: Vec<Line> = Vec::new();
+        for (i, line) in raw_lines.iter().enumerate() {
+            let color = if i % 2 == 0 { purple } else { lime };
+            styled_lines.push(Line::from(Span::styled(
+                *line,
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            )));
+        }
+        // bottom padding
+        styled_lines.push(Line::from(Span::raw(" ")));
+
+        let p = Paragraph::new(styled_lines)
+            .block(Block::default().borders(Borders::NONE))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true });
+        frame.render_widget(p, parts[0]);
+        content_area = parts[1];
+    }
+
     if app.modules.is_empty() {
         let msg = if app.is_refreshing {
             "Scanning…"
@@ -446,7 +487,7 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
             .block(block)
             .style(Style::default().fg(Color::DarkGray))
             .wrap(Wrap { trim: true });
-        frame.render_widget(p, area);
+        frame.render_widget(p, content_area);
         return;
     }
 
@@ -500,7 +541,7 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
         )
         .highlight_symbol("▶ ");
 
-    frame.render_stateful_widget(list, area, &mut list_state);
+    frame.render_stateful_widget(list, content_area, &mut list_state);
 }
 
 fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {

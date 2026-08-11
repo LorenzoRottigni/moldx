@@ -57,15 +57,18 @@ pub enum Commands {
         depth: usize,
     },
 
-    /// Scaffold a module from a strategy template
-    New {
-        /// Remaining arguments after `moldx new`
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 1..)]
-        args: Vec<String>,
-    },
+    /// Create a new .moldx/ template directory in the current working directory
+    Init,
 
     /// Run a command: moldx [strategy] <command> <path>
     /// Strategy is optional; if omitted, the best matching strategy variant is used.
     #[command(external_subcommand)]
     Run(Vec<String>),
+
+    /// Scaffold command scripts in .moldx/bin
+    New {
+        /// Arguments: either `<command>` or `<strategy> <command>`
+        #[arg(required = true, num_args = 1..=2)]
+        args: Vec<String>,
+    },
 }

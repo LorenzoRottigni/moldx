@@ -337,11 +337,9 @@ mod tests {
     fn process_status_label() {
         assert_eq!(ProcessStatus::Running.label(), "Running");
         assert_eq!(ProcessStatus::Completed(0).label(), "Done(0)");
-        assert!(
-            ProcessStatus::Failed("timeout".into())
-                .label()
-                .contains("timeout")
-        );
+        assert!(ProcessStatus::Failed("timeout".into())
+            .label()
+            .contains("timeout"));
         assert_eq!(ProcessStatus::Killed.label(), "Killed");
     }
 

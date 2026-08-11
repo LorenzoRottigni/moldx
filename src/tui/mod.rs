@@ -40,13 +40,13 @@ use ratatui::{
     Frame, Terminal,
 };
 use std::{io, sync::Arc, time::Duration};
-use tokio::sync::oneshot;
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::sync::oneshot;
 
 use crate::{
     config::MoldxConfig,
-    probe::{self, Module, AGNOSTIC_STRATEGY},
+    probe::{self, CommandBinding, Module},
 };
 
 pub mod executor;
@@ -123,8 +123,8 @@ struct TuiApp {
     command_idx: usize,
     /// Index of the selected row in the Running panel.
     running_idx: usize,
-    /// Flat (strategy, command) pairs derived from the selected module.
-    command_items: Vec<(String, String)>,
+    /// Flat (strategy, command, script) entries derived from the selected module.
+    command_items: Vec<CommandItem>,
     /// True while a background module re-scan is in flight.
     is_refreshing: bool,
     /// Receives the result of an in-flight background module scan.
@@ -132,6 +132,12 @@ struct TuiApp {
     /// How many lines the output view in the Running panel has been scrolled up.
     output_scroll: usize,
     log: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct CommandItem {
+    strategy: String,
+    binding: CommandBinding,
 }
 
 impl TuiApp {
@@ -158,11 +164,17 @@ impl TuiApp {
         self.command_items.clear();
         self.command_idx = 0;
         if let Some(m) = self.modules.get(self.module_idx) {
-            let mut strategies: Vec<(&String, &Vec<String>)> = m.strategies.iter().collect();
+            let mut strategies: Vec<(&String, &Vec<CommandBinding>)> =
+                m.strategies.iter().collect();
             strategies.sort_by_key(|(s, _)| s.as_str());
             for (strategy, commands) in strategies {
-                for cmd in commands {
-                    self.command_items.push((strategy.clone(), cmd.clone()));
+                let mut commands = commands.clone();
+                commands.sort_by(|a, b| a.command.cmp(&b.command));
+                for binding in commands {
+                    self.command_items.push(CommandItem {
+                        strategy: strategy.clone(),
+                        binding,
+                    });
                 }
             }
         }
@@ -217,18 +229,13 @@ impl TuiApp {
             Some(m) => m.path.clone(),
             None => return,
         };
-        let (strategy, command) = match self.command_items.get(self.command_idx) {
-            Some(pair) => pair.clone(),
+        let item = match self.command_items.get(self.command_idx) {
+            Some(item) => item.clone(),
             None => return,
         };
-        let script = if strategy == AGNOSTIC_STRATEGY {
-            self.config.bin_dir.join(format!("{}.sh", command))
-        } else {
-            self.config
-                .bin_dir
-                .join(&command)
-                .join(format!("{}.sh", strategy))
-        };
+        let strategy = item.strategy.clone();
+        let command = item.binding.command.clone();
+        let script = item.binding.script_path.clone();
 
         let id = self
             .state
@@ -524,7 +531,7 @@ fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
         .command_items
         .iter()
         .enumerate()
-        .map(|(i, (strategy, cmd))| {
+        .map(|(i, item)| {
             let style = if i == app.command_idx && active {
                 Style::default()
                     .fg(Color::Green)
@@ -536,10 +543,10 @@ fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
             };
             ListItem::new(Line::from(vec![
                 Span::styled(
-                    format!("[{}] ", strategy),
+                    format!("[{}] ", item.strategy),
                     Style::default().fg(Color::Magenta),
                 ),
-                Span::styled(cmd, style),
+                Span::styled(item.binding.command.as_str(), style),
             ]))
         })
         .collect();

@@ -19,27 +19,37 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let moldx_dir_override = cli.moldx_dir.as_deref().map(std::path::Path::new);
-    let bin_dir_override = cli.bin_dir.as_deref().map(std::path::Path::new);
+    let strategies_dir_override_value = cli
+        .strategies_dir
+        .or_else(|| std::env::var("MOLDX_BIN_DIR").ok());
+    let strategies_dir_override = strategies_dir_override_value
+        .as_deref()
+        .map(std::path::Path::new);
 
     match cli.command.unwrap_or(Commands::Ui) {
         // moldx [ui]
         Commands::Ui => {
-            commands::ui::ui(moldx_dir_override, bin_dir_override).await?;
+            commands::ui::ui(moldx_dir_override, strategies_dir_override).await?;
         }
 
         // moldx detect <path>
         Commands::Detect { path } => {
-            commands::detect::detect(path, moldx_dir_override, bin_dir_override).await?;
+            commands::detect::detect(path, moldx_dir_override, strategies_dir_override).await?;
         }
 
         // moldx list [<path>] [--depth <depth>]
         Commands::List { path, depth } => {
-            commands::list::list(path, depth, moldx_dir_override, bin_dir_override).await?;
+            commands::list::list(path, depth, moldx_dir_override, strategies_dir_override).await?;
+        }
+
+        // moldx new module ...
+        Commands::New { args } => {
+            commands::new::new(args, moldx_dir_override, strategies_dir_override).await?;
         }
 
         // moldx [strategy] <command> <path>
         Commands::Run(args) => {
-            commands::run::run(args, moldx_dir_override, bin_dir_override).await?;
+            commands::run::run(args, moldx_dir_override, strategies_dir_override).await?;
         }
     }
 

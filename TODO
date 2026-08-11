@@ -1,0 +1,20 @@
+# TODO
+
+## Executors
+
+- allow a dir .moldx/executors allowing strategies to use non-bash commands.
+- by default all commands are treated as shell scripts, executors adds the abstraction of using other kinds of scripts such as python, node, compiled binaries, ...
+- e.g. executors/python.sh can:
+  - validate python is installed in the env
+  - receive the arguments of the moldx invocated command arguments
+  - invoke python command to the target script forwarding the args passed to the original moldx command
+  - executor shell script is a wrapper around the command invokation of a desired target
+  - Both flag args and positional args of the moldx command are forwarded to the command handler, the only requirement is that the first positional arg is the path of the target module.
+
+## .moldx serialization
+
+- Allow to build/serialize the .moldx dir into some binary contract
+- the binary contract is portable and can be passed to the moldx command on whatever host to act as a .moldx dir
+- another use case for this is to hold inside a container just the built .moldx dir and not the itself
+- .binary contract can be also deserialized back into a .moldx dir
+- this can introduce a plugins system where strategies are built and published somewhere and then the consumer pulls and use thems

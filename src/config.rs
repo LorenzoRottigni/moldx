@@ -1,21 +1,27 @@
 //! Configuration resolution for a moldx project.
 //!
-//! The core concept is simple: a project that uses moldx has a `.moldx/`
-//! directory somewhere in its tree.  [`MoldxConfig::resolve`] finds it by
-//! walking *up* from the given starting path, exactly like `git` locates
-//! `.git/`.
+//! A moldx-enabled project contains a `.moldx/` directory somewhere in its
+//! tree. [`MoldxConfig::resolve`] finds that directory by walking upward from
+//! the starting path, then exposes the resolved strategies directory.
 //!
 //! ## Directory layout
 //!
 //! ```text
 //! <project-root>/
 //!   .moldx/
-//!     probe.sh             # receives a module path, prints strategy names
-//!     bin/
-//!       <command>.sh                 # strategy-agnostic command
-//!       <command>/<strategy>.sh      # strategy-specific variant
+//!     strategies/
+//!       docker/
+//!         bin/
+//!           build.sh
+//!           deploy.sh
+//!         template/
+//!           Dockerfile
+//!       default/
+//!         template/        # empty => agnostic commands
+//!         bin/
+//!           diff.sh
 //! ```
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use std::path::{Path, PathBuf};
 
 /// Resolved locations of all moldx configuration artefacts.
@@ -28,10 +34,8 @@ pub struct MoldxConfig {
     /// `.moldx/` directory — kept for callers that need to locate the config root
     #[allow(dead_code)]
     pub moldx_dir: PathBuf,
-    /// `.moldx/probe.sh`
-    pub probe_path: PathBuf,
-    /// `.moldx/bin/`
-    pub bin_dir: PathBuf,
+    /// `.moldx/strategies/`
+    pub strategies_dir: PathBuf,
 }
 
 impl MoldxConfig {
@@ -39,13 +43,12 @@ impl MoldxConfig {
     ///
     /// Precedence (highest first):
     /// 1. `moldx_dir_override` / `MOLDX_DIR` env var
-    /// 2. `bin_dir_override` / `MOLDX_BIN_DIR` env var (only
-    ///    affects the bin directory, not the probe script)
+    /// 2. `strategies_dir_override` / `MOLDX_STRATEGIES_DIR` env var
     /// 3. Auto-discovery: walk up from `start` until a `.moldx/` directory is found
     pub fn resolve(
         start: &Path,
         moldx_dir_override: Option<&Path>,
-        bin_dir_override: Option<&Path>,
+        strategies_dir_override: Option<&Path>,
     ) -> Result<Self> {
         let moldx_dir = if let Some(p) = moldx_dir_override {
             p.to_path_buf()
@@ -55,17 +58,14 @@ impl MoldxConfig {
 
         let root = moldx_dir.parent().unwrap_or(&moldx_dir).to_path_buf();
 
-        let bin_dir = bin_dir_override
+        let strategies_dir = strategies_dir_override
             .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| moldx_dir.join("bin"));
-
-        let probe_path = moldx_dir.join("probe.sh");
+            .unwrap_or_else(|| moldx_dir.join("strategies"));
 
         Ok(MoldxConfig {
             root,
             moldx_dir,
-            probe_path,
-            bin_dir,
+            strategies_dir,
         })
     }
 }
@@ -89,7 +89,7 @@ fn find_moldx_dir(start: &Path) -> Result<PathBuf> {
             Some(parent) => current = parent.to_path_buf(),
             None => bail!(
                 "No .moldx directory found (searched up from {}).\n\
-                 Create ./.moldx/probe.sh and ./.moldx/bin/ to get started.",
+                 Create ./.moldx/strategies/ to get started.",
                 start.display()
             ),
         }
@@ -136,17 +136,16 @@ mod tests {
         let cfg =
             MoldxConfig::resolve(std::path::Path::new("/nonexistent"), Some(&moldx), None).unwrap();
         assert_eq!(cfg.moldx_dir, moldx);
-        assert_eq!(cfg.probe_path, moldx.join("probe.sh"));
-        assert_eq!(cfg.bin_dir, moldx.join("bin"));
+        assert_eq!(cfg.strategies_dir, moldx.join("strategies"));
     }
 
     #[test]
-    fn resolve_uses_custom_bin_dir_when_provided() {
+    fn resolve_uses_custom_strategies_dir_when_provided() {
         let tmp = TempDir::new().unwrap();
         let moldx = tmp.path().join(".moldx");
-        let bin = tmp.path().join("my-bin");
+        let strategies = tmp.path().join("my-strategies");
         std::fs::create_dir(&moldx).unwrap();
-        let cfg = MoldxConfig::resolve(tmp.path(), Some(&moldx), Some(&bin)).unwrap();
-        assert_eq!(cfg.bin_dir, bin);
+        let cfg = MoldxConfig::resolve(tmp.path(), Some(&moldx), Some(&strategies)).unwrap();
+        assert_eq!(cfg.strategies_dir, strategies);
     }
 }

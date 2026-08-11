@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use predicates::str::contains;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 fn playground() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("playground")
@@ -191,6 +192,20 @@ fn run_agnostic_command_without_strategy_succeeds() {
         .assert()
         .success()
         .stdout(contains("agnostic/diff"));
+}
+
+#[test]
+fn new_module_scaffolds_from_strategy_template() {
+    let tmp = TempDir::new().unwrap();
+    let target = tmp.path().join("scaffolded-service");
+
+    moldx()
+        .args(["new", "module", "docker", target.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(contains("Scaffolded"));
+
+    assert!(target.join("Dockerfile").exists());
 }
 
 // ── help ──────────────────────────────────────────────────────────────────────

@@ -1,9 +1,9 @@
 //! CLI argument definitions for moldx.
 //!
 //! Built with [clap](https://docs.rs/clap). Global options (`--moldx-dir`,
-//! `--bin-dir`) are also readable from the `MOLDX_DIR` and `MOLDX_BIN_DIR`
-//! environment variables so they can be set once in a shell profile for a
-//! project-wide override.
+//! `--strategies-dir`) are also readable from the `MOLDX_DIR` and
+//! `MOLDX_STRATEGIES_DIR` environment variables so they can be set once in a
+//! shell profile for a project-wide override.
 
 pub mod commands;
 
@@ -22,9 +22,14 @@ pub struct Cli {
     #[arg(long, env = "MOLDX_DIR", global = true)]
     pub moldx_dir: Option<String>,
 
-    /// Override the bin directory location (or set MOLDX_BIN_DIR env var)
-    #[arg(long, env = "MOLDX_BIN_DIR", global = true)]
-    pub bin_dir: Option<String>,
+    /// Override the strategies directory location (or set MOLDX_STRATEGIES_DIR env var)
+    #[arg(
+        long = "strategies-dir",
+        alias = "bin-dir",
+        env = "MOLDX_STRATEGIES_DIR",
+        global = true
+    )]
+    pub strategies_dir: Option<String>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -50,6 +55,13 @@ pub enum Commands {
         /// Maximum directory depth to scan
         #[arg(long, default_value = "3")]
         depth: usize,
+    },
+
+    /// Scaffold a module from a strategy template
+    New {
+        /// Remaining arguments after `moldx new`
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true, num_args = 1..)]
+        args: Vec<String>,
     },
 
     /// Run a command: moldx [strategy] <command> <path>

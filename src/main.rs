@@ -8,6 +8,7 @@ mod config;
 mod executor;
 mod probe;
 mod tui;
+mod v2;
 
 use anyhow::Result;
 use clap::Parser;

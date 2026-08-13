@@ -3,13 +3,7 @@ async fn main() -> Result<()> {
     // Init CLI parsing the incoming command (cli.command)
     let command = cli::parse_cli_command().ok_or_else(|| anyhow!("No command provided"))?;
     // create a new config considering strategies_dir override
-    let config = MoldXConfig::new(
-        if let Some(dir) = command.flags.strategies_dir {
-            Some(dir)
-        } else {
-            None
-        }
-    );
+    let config = MoldXConfig::new(command.strategies_dir.clone());
     // create a new client with the config
     let client = MoldXClient::new(config);
 

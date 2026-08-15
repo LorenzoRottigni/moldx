@@ -9,3 +9,4 @@ pub mod main;
 pub mod executor;
 pub mod module;
 pub mod types;
+pub mod tui;

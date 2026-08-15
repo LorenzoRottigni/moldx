@@ -50,12 +50,12 @@ async fn main() -> Result<()> {
 
         // moldx init
         Commands::Init => {
-            commands::init::init(moldx_dir_override, bin_dir_override).await?;
+            // commands::init::init(moldx_dir_override, bin_dir_override).await?;
         }
 
         // moldx new [strategy] <command> | moldx new <command>
         Commands::New { args } => {
-            commands::new::new(args, moldx_dir_override, bin_dir_override).await?;
+            // commands::new::new(args, moldx_dir_override, bin_dir_override).await?;
         }
 
         // moldx [strategy] <command> <path>

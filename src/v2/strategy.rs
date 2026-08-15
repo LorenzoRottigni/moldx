@@ -69,8 +69,8 @@ impl Strategy {
             .map(|templates| templates.into_iter().flatten().collect())
     }
 
-    pub fn get_command(&self, name: String) -> Option<Command> {
-        self.commands.iter().find(|c| c.name == name).cloned()
+    pub fn get_command(&self, name: &String) -> Option<Command> {
+        self.commands.iter().find(|c| c.name == *name).cloned()
     }
 }
 

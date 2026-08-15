@@ -91,4 +91,8 @@ impl MoldXClient {
     pub fn get_templates(&self) -> Vec<Template> {
         self.strategies.iter().flat_map(|s| s.templates.clone()).collect()
     }
+
+    pub fn get_default_strategies(&self) -> Vec<Strategy> {
+        self.strategies.iter().filter(|s| s.templates.is_empty()).cloned().collect()
+    }
 }

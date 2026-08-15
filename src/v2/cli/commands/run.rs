@@ -1,4 +1,4 @@
-use crate::v2::client::MoldXClient;
+use crate::v2::{client::MoldXClient, command::Command};
 use anyhow::{bail, Result};
 
 
@@ -22,12 +22,16 @@ pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
         )
     };
 
-    if let Some(strategy) = client.get_strategy(&strategy_hint.clone().unwrap_or("default".to_string())) {
-        let command = strategy.get_command(command_name).expect(&format!("Command not found for strategy {:?}", strategy_hint));
-        let code = client.executor.exec_blocking(&command.dir, &path).await?;
-        if code != 0 {
-            std::process::exit(code);
-        }
+    let command: Command = if let Some(strategy) = strategy_hint {
+        client.get_strategy(&strategy).expect("Unable to retrieve strategy").get_command(&command_name).expect("Unable to retrieve command for given strategy")
+    } else {
+        client.get_default_strategies().iter().find_map(|s| s.get_command(&command_name)).expect("Unable to retrieve command from default strategy")
+    };
+
+    let code = client.executor.exec_blocking(&command.dir, &path).await?;
+
+    if code != 0 {
+        std::process::exit(code);
     }
 
     Ok(())

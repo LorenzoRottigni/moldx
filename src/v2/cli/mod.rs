@@ -58,37 +58,32 @@ impl Cli {
         match self.command.unwrap_or(Command::Ui) {
             // moldx [ui]
             Command::Ui => {
-                commands::ui::ui(client).await?;
+                commands::ui::ui(&client).await?;
             }
 
             // moldx detect <path>
             Command::Detect { path } => {
-                commands::detect::detect(client, path).await?;
+                commands::detect::detect(&client, path).await?;
             }
 
             // moldx list [<path>] [--depth <depth>]
             Command::List => {
-                commands::list::list(client).await?;
+                commands::list::list(&client).await?;
             }
 
-            // moldx new module ...
+            // moldx new [] [] <>
             Command::New { args } => {
-                commands::new::new(client, args).await?;
+                commands::new::new(&client, args).await?;
             }
 
             // moldx init
             Command::Init => {
-                commands::init::init(client).await?;
-            }
-
-            // moldx new [strategy] <command> | moldx new <command>
-            Command::New { args } => {
-                commands::new::new(client, args).await?;
+                commands::init::init(&client).await?;
             }
 
             // moldx [strategy] <command> <path>
             Command::Run(args) => {
-                commands::run::run(client, args).await?;
+                commands::run::run(&client, args).await?;
             }
         }
         Ok(())

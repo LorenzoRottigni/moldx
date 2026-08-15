@@ -4,7 +4,7 @@ use crate::v2::client::MoldXClient;
 use anyhow::Result;
 
 pub async fn detect(
-    client: MoldXClient,
+    client: &MoldXClient,
     path: PathBuf
 ) -> Result<()> {
     let strategies = client.strategies_for_module(&path);

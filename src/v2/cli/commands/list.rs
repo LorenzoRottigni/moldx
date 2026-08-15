@@ -2,7 +2,7 @@
 use crate::v2::client::MoldXClient;
 use anyhow::Result;
 
-pub async fn list(client: MoldXClient) -> Result<()> {
+pub async fn list(client: &MoldXClient) -> Result<()> {
     if client.modules.is_empty() {
         println!("No modules found recursively starting from {}", client.config.cwd.to_string_lossy());
     } else {

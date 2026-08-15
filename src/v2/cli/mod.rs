@@ -1,15 +1,98 @@
 use clap::{Subcommand};
 use std::path::PathBuf;
 use clap::Parser;
+use anyhow::Result;
 
-pub fn parse_cli_command() -> Option<Command> {
-    #[derive(Parser)]
-    struct _Temp {
-        #[command(subcommand)]
-        command: Option<Command>,
+use crate::v2::client::MoldXClient;
+
+pub mod commands;
+
+#[derive(Parser)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
+    #[arg(
+        long = "moldx-dir",
+        env = "MOLDX_MOLDX_DIR",
+        global = true,
+        default_value = ".moldx"
+    )]
+    pub moldx_dir: String,
+
+    #[arg(
+        long = "strategies-dir-name",
+        env = "MOLDX_STRATEGIES_DIR_NAME",
+        global = true,
+        default_value = "strategies"
+    )]
+    pub strategies_dir_name: String,
+
+    #[arg(
+        long = "bin-dir-name",
+        env = "MOLDX_BIN_DIR_NAME",
+        global = true,
+        default_value = "bin"
+    )]
+    pub bin_dir_name: String,
+
+    #[arg(
+        long = "templates-dir-name",
+        env = "MOLDX_TEMPLATES_DIR_NAME",
+        global = true,
+        default_value = "templates"
+    )]
+    pub templates_dir_name: String,
+
+    #[arg(
+        long = "template-dir-name",
+        env = "MOLDX_TEMPLATE_DIR_NAME",
+        global = true,
+        default_value = "template"
+    )]
+    pub template_dir_name: String,
+}
+
+impl Cli {
+    pub async fn exec_with(self, client: MoldXClient) -> Result<()> {
+        match self.command.unwrap_or(Command::Ui) {
+            // moldx [ui]
+            Command::Ui => {
+                commands::ui::ui(client).await?;
+            }
+
+            // moldx detect <path>
+            Command::Detect { path } => {
+                commands::detect::detect(client, path).await?;
+            }
+
+            // moldx list [<path>] [--depth <depth>]
+            Command::List { path, depth } => {
+                commands::list::list(client, path, depth).await?;
+            }
+
+            // moldx new module ...
+            Command::New { args } => {
+                commands::new::new(client, args).await?;
+            }
+
+            // moldx init
+            Command::Init => {
+                commands::init::init(client).await?;
+            }
+
+            // moldx new [strategy] <command> | moldx new <command>
+            Command::New { args } => {
+                commands::new::new(client, args).await?;
+            }
+
+            // moldx [strategy] <command> <path>
+            Command::Run(args) => {
+                commands::run::run(client, args).await?;
+            }
+        }
+        Ok(())
     }
-    
-    _Temp::parse().command
 }
 
 #[derive(Subcommand)]

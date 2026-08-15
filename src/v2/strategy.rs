@@ -1,65 +1,81 @@
-use std::path::{Path, PathBuf};
-use std::collections::{BTreeMap};
+use std::fmt::{self, Display};
+use std::path::PathBuf;
 use anyhow::{Result};
 
 use crate::v2::fs::{sorted_read_dir};
 use crate::v2::template::{Template};
 use crate::v2::command::{Command};
 
+#[derive(Debug, Clone)]
 pub struct Strategy {
     pub name: String,
-    pub commands: BTreeMap<String, PathBuf>,
+    pub dir: PathBuf,
+    pub commands: Vec<Command>,
     pub templates: Vec<Template>,
 }
 
 impl Strategy {
-    pub fn new(name: String, strategy_dir: &Path) -> Result<Self> {
-        let commands = Self::load_commands(strategy_dir)?;
-        let templates = Self::load_templates(strategy_dir)?;
+    pub fn new(strategy_dir: PathBuf) -> Result<Self> {
+        strategy_dir.exists() && strategy_dir.is_dir() ||
+            return Err(anyhow::anyhow!("Invalid strategy directory"));
+        let name = strategy_dir
+            .file_name()
+            .expect("Strategy directory has no file name")
+            .to_string_lossy()
+            .into_owned();
+        let commands = Self::resolve_commands(&strategy_dir)?;
+        let templates = Self::resolve_templates(&strategy_dir)?;
         Ok(Self {
+            dir: strategy_dir,
             name,
             commands,
             templates,
         })
     }
 
-    pub fn load_commands(strategy_dir: &Path) -> Result<BTreeMap<String, PathBuf>> {
-        let mut scripts = BTreeMap::new();
-
-        let bin_dir = strategy_dir.join("bin");
-        if bin_dir.is_dir() {
-            for entry in sorted_read_dir(&bin_dir)? {
-                let path = entry.path();
-                if let Some(command) = Command::new(path) {
-                    scripts.insert(command.name, command.path);
-                }
-            }
-        }
-
-        Ok(scripts)
+    pub fn resolve_commands(strategy_dir: &PathBuf) -> Result<Vec<Command>> {
+        let commands_dir = strategy_dir.join("bin");
+        commands_dir.exists() && commands_dir.is_dir() ||
+            return Err(anyhow::anyhow!("Invalid strategy commands directory"));
+        Ok(sorted_read_dir(&commands_dir)?
+            .into_iter()
+            .filter(|e| e.path().is_file())
+            .filter_map(|e| Command::new(e.path()))
+            .collect())
     }
 
-    pub fn load_templates(strategy_dir: &Path) -> Result<Vec<Template>> {
-        let mut templates = Vec::new();
+    pub fn resolve_templates(strategy_dir: &PathBuf) -> Result<Vec<Template>> {
+        [
+            strategy_dir.join("template"),
+            strategy_dir.join("templates"),
+        ]
+            .into_iter()
+            .filter(|dir| dir.is_dir())
+            .map(|dir| {
+                sorted_read_dir(&dir).map(|entries| {
+                    entries
+                        .into_iter()
+                        .filter(|e| e.path().is_dir())
+                        .filter_map(|e| {
+                            Template::new(
+                                e.file_name().to_string_lossy().into_owned(),
+                                e.path(),
+                            ).ok()
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(|templates| templates.into_iter().flatten().collect())
+    }
 
-        let singular = strategy_dir.join("template");
-        if singular.is_dir() {
-            templates.push(Template::new("template".to_string(), &singular)?);
-        }
-
-        let plural = strategy_dir.join("templates");
-        if plural.is_dir() {
-            for entry in sorted_read_dir(&plural)? {
-                let path = entry.path();
-                if path.is_dir() {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    templates.push(Template::new(name, &path)?);
-                }
-            }
-        }
-
-        templates.sort_by(|a, b| a.file_names.len().cmp(&b.file_names.len()));
-        Ok(templates)
+    pub fn available_for(self, path: &PathBuf) -> bool {
+        true
     }
 }
 
+impl Display for Strategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}

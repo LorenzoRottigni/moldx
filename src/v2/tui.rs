@@ -24,8 +24,6 @@ use crate::v2::{
     module::Module,
 };
 
-pub mod state;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Panel {
     Modules,

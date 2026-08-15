@@ -1,7 +1,7 @@
 use std::path::{PathBuf};
 use std::collections::{BTreeSet};
 use anyhow::{Result};
-use crate::v2::fs::{file_names_for_dir};
+use crate::fs::{file_names_for_dir};
 
 #[derive(Debug, Clone)]
 pub struct Template {

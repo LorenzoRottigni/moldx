@@ -1,43 +1,97 @@
-//! CLI argument definitions for moldx.
-//!
-//! Built with [clap](https://docs.rs/clap). Global options (`--moldx-dir`,
-//! `--strategies-dir`) are also readable from the `MOLDX_DIR` and
-//! `MOLDX_STRATEGIES_DIR` environment variables so they can be set once in a
-//! shell profile for a project-wide override.
+use clap::{Subcommand};
+use std::path::PathBuf;
+use clap::Parser;
+use anyhow::Result;
+
+use crate::client::MoldXClient;
 
 pub mod commands;
 
-use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-
-/// Top-level CLI structure parsed by clap.
 #[derive(Parser)]
-#[command(
-    name = "moldx",
-    about = "Technology-agnostic orchestration engine for submodule lifecycle management",
-    long_about = "Standardizes submodule lifecycle management through user-defined shell-based strategies.\n\nUsage: moldx [strategy] <command> <path>"
-)]
 pub struct Cli {
-    /// Override the .moldx directory location (or set MOLDX_DIR env var)
-    #[arg(long, env = "MOLDX_DIR", global = true)]
-    pub moldx_dir: Option<String>,
-
-    /// Override the strategies directory location (or set MOLDX_STRATEGIES_DIR env var)
-    #[arg(
-        long = "strategies-dir",
-        alias = "bin-dir",
-        env = "MOLDX_STRATEGIES_DIR",
-        global = true
-    )]
-    pub strategies_dir: Option<String>,
-
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Option<Command>,
+
+    #[arg(
+        long = "moldx-dir",
+        env = "MOLDX_MOLDX_DIR",
+        global = true,
+        default_value = ".moldx"
+    )]
+    pub moldx_dir: String,
+
+    #[arg(
+        long = "strategies-dir-name",
+        env = "MOLDX_STRATEGIES_DIR_NAME",
+        global = true,
+        default_value = "strategies"
+    )]
+    pub strategies_dir_name: String,
+
+    #[arg(
+        long = "bin-dir-name",
+        env = "MOLDX_BIN_DIR_NAME",
+        global = true,
+        default_value = "bin"
+    )]
+    pub bin_dir_name: String,
+
+    #[arg(
+        long = "templates-dir-name",
+        env = "MOLDX_TEMPLATES_DIR_NAME",
+        global = true,
+        default_value = "templates"
+    )]
+    pub templates_dir_name: String,
+
+    #[arg(
+        long = "template-dir-name",
+        env = "MOLDX_TEMPLATE_DIR_NAME",
+        global = true,
+        default_value = "template"
+    )]
+    pub template_dir_name: String,
 }
 
-/// All subcommands exposed by moldx.
+impl Cli {
+    pub async fn exec_with(self, client: MoldXClient) -> Result<()> {
+        match self.command.unwrap_or(Command::Ui) {
+            // moldx [ui]
+            Command::Ui => {
+                commands::ui::ui(&client).await?;
+            }
+
+            // moldx detect <path>
+            Command::Detect { path } => {
+                commands::detect::detect(&client, path).await?;
+            }
+
+            // moldx list [<path>] [--depth <depth>]
+            Command::List => {
+                commands::list::list(&client).await?;
+            }
+
+            // moldx new [] [] <>
+            Command::New { args } => {
+                commands::new::new(&client, args).await?;
+            }
+
+            // moldx init
+            Command::Init => {
+                commands::init::init(&client).await?;
+            }
+
+            // moldx [strategy] <command> <path>
+            Command::Run(args) => {
+                commands::run::run(&client, args).await?;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Subcommand)]
-pub enum Commands {
+pub enum Command {
     /// Launch the interactive terminal UI
     Ui,
 
@@ -48,14 +102,7 @@ pub enum Commands {
     },
 
     /// List all discovered modules under a root path
-    List {
-        /// Root path to scan (defaults to current directory)
-        path: Option<PathBuf>,
-
-        /// Maximum directory depth to scan
-        #[arg(long, default_value = "3")]
-        depth: usize,
-    },
+    List,
 
     /// Create a new .moldx/ template directory in the current working directory
     Init,

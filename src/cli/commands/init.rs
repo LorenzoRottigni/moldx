@@ -1,77 +1,46 @@
 use anyhow::Result;
 use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::path::{PathBuf};
+
+use crate::client::MoldXClient;
 
 pub async fn init(
-    moldx_dir_override: Option<&Path>,
-    bin_dir_override: Option<&Path>,
+    client: &MoldXClient
 ) -> Result<()> {
-    let cwd = std::env::current_dir()?;
-    let moldx_dir: PathBuf = if let Some(p) = moldx_dir_override {
-        p.to_path_buf()
-    } else {
-        cwd.join(".moldx")
-    };
+    let moldx_dir: PathBuf = client.config.moldx_dir.clone();
+    let strategies_dir: PathBuf = client.config.strategies_dir.clone();
+    let bin_dir_name: String = client.config.bin_dir_name.clone();
+    let template_dir_name: String = client.config.bin_dir_name.clone();
 
-    // Determine bin dir (either override or <moldx_dir>/bin)
-    let bin_dir: PathBuf = if let Some(b) = bin_dir_override {
-        b.to_path_buf()
+    if !strategies_dir.exists() {
+        fs::create_dir_all(&strategies_dir)?;
+        println!("Created {}", strategies_dir.display());
     } else {
-        moldx_dir.join("bin")
-    };
-
-    // Create directories
-    if !moldx_dir.exists() {
-        fs::create_dir_all(&moldx_dir)?;
-        println!("Created {}", moldx_dir.display());
-    } else {
-        println!("Directory already exists: {}", moldx_dir.display());
+        println!("Directory already exists: {}", strategies_dir.display());
     }
 
-    if !bin_dir.exists() {
-        fs::create_dir_all(&bin_dir)?;
-        println!("Created {}", bin_dir.display());
-    } else {
-        println!("Directory already exists: {}", bin_dir.display());
-    }
-
-    // Write probe.sh if missing
-    let probe_path = moldx_dir.join("probe.sh");
-    if probe_path.exists() {
-        println!("probe.sh already exists: {}", probe_path.display());
-    } else {
-        let mut f = fs::File::create(&probe_path)?;
-        let content = "#!/usr/bin/env bash\nTARGET=\"$1\"\n[ -f \"$TARGET/Dockerfile\" ]   && echo \"docker\"\n[ -f \"$TARGET/package.json\" ] && echo \"node\"\n[ -f \"$TARGET/Cargo.toml\" ]   && echo \"rust\"\n";
-        f.write_all(content.as_bytes())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&probe_path)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&probe_path, perms)?;
-        }
-        println!("Wrote probe script: {}", probe_path.display());
-    }
+    
+    let default_strategy_dir = strategies_dir.join("default");
+    [
+        default_strategy_dir.join(&bin_dir_name).join(".keep"),
+        default_strategy_dir.join(&template_dir_name).join(".keep"),
+    ]
+        .iter()
+        .try_for_each(|path| {
+            fs::create_dir_all(path.parent().unwrap())?;
+            File::create(path)?;
+            Ok::<(), std::io::Error>(())
+        })?;
 
     // Write .moldx/README.md
     let readme_path = moldx_dir.join("README.md");
     if readme_path.exists() {
         println!("README.md already exists: {}", readme_path.display());
     } else {
-        let content = "# .moldx\n\nThis directory contains project-local configuration for moldx.\n\n- `probe.sh`: detects strategies for a given module path.\n- `bin/`: command scripts (strategy-specific and agnostic).\n\nSee the top-level moldx README for full documentation.\n";
+        let content = "# .moldx";
         fs::write(&readme_path, content)?;
         println!("Wrote {}", readme_path.display());
-    }
-
-    // Write .moldx/bin/README.md
-    let bin_readme = bin_dir.join("README.md");
-    if bin_readme.exists() {
-        println!("bin README already exists: {}", bin_readme.display());
-    } else {
-        let content = "# .moldx/bin\n\nPlace command scripts here. Two layouts are supported:\n\n- Strategy-agnostic: `.moldx/bin/<command>.sh`\n- Strategy-specific: `.moldx/bin/<command>/<strategy>.sh`\n\nEach script receives the absolute module path as `$1` and should forward its exit code.\n";
-        fs::write(&bin_readme, content)?;
-        println!("Wrote {}", bin_readme.display());
     }
 
     Ok(())

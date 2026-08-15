@@ -2,12 +2,12 @@ use std::path::PathBuf;
 use anyhow::Result;
 use walkdir::WalkDir;
 
-use crate::v2::config::MoldXConfig;
-use crate::v2::executor::Executor;
-use crate::v2::strategy::{Strategy};
-use crate::v2::fs::{sorted_read_dir, is_ignored_name};
-use crate::v2::template::Template;
-use crate::v2::module::Module;
+use crate::config::MoldXConfig;
+use crate::executor::Executor;
+use crate::strategy::{Strategy};
+use crate::fs::{sorted_read_dir, is_ignored_name};
+use crate::template::Template;
+use crate::module::Module;
 
 #[derive(Debug)]
 pub struct MoldXClient {

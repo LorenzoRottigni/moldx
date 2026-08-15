@@ -1,4 +1,4 @@
-use crate::v2::client::MoldXClient;
+use crate::client::MoldXClient;
 use anyhow::{Result, bail};
 use std::{fs, path::PathBuf};
 

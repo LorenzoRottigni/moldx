@@ -2,9 +2,9 @@ use std::fmt::{self, Display};
 use std::path::PathBuf;
 use anyhow::{Result};
 
-use crate::v2::fs::{sorted_read_dir};
-use crate::v2::template::{Template};
-use crate::v2::command::{Command};
+use crate::fs::{sorted_read_dir};
+use crate::template::{Template};
+use crate::command::{Command};
 
 #[derive(Debug, Clone)]
 pub struct Strategy {

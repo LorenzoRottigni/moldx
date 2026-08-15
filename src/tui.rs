@@ -17,7 +17,7 @@ use std::{io, sync::Arc, time::Duration};
 #[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
 
-use crate::v2::{
+use crate::{
     client::MoldXClient,
     command::Command,
     executor::{self, Executor},

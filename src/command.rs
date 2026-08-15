@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::v2::fs::is_shell_script;
+use crate::fs::is_shell_script;
 
 #[derive(Debug, Clone)]
 pub struct Command {

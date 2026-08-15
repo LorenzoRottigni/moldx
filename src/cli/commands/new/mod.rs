@@ -3,7 +3,7 @@ mod module;
 mod strategy;
 mod template;
 
-use crate::v2::{client::MoldXClient, types::Entity};
+use crate::{client::MoldXClient, types::Entity};
 use anyhow::{anyhow, bail, Result};
 
 pub async fn new(client: &MoldXClient, args: Vec<String>) -> Result<()> {

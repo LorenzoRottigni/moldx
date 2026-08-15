@@ -69,10 +69,6 @@ impl Strategy {
             .map(|templates| templates.into_iter().flatten().collect())
     }
 
-    pub fn available_for(self, path: &PathBuf) -> bool {
-        true
-    }
-
     pub fn get_command(&self, name: String) -> Option<Command> {
         self.commands.iter().find(|c| c.name == name).cloned()
     }

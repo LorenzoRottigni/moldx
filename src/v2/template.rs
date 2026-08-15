@@ -20,4 +20,12 @@ impl Template {
             dir: template_dir,
         })
     }
+
+    pub fn matches(&self, target: &PathBuf) -> bool {
+        let Ok(target_files) = file_names_for_dir(target) else {
+            return false;
+        };
+
+        self.file_names.is_subset(&target_files)
+    }
 }

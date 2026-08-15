@@ -6,3 +6,5 @@ pub mod command;
 pub mod config;
 pub mod cli;
 pub mod main;
+pub mod executor;
+pub mod module;

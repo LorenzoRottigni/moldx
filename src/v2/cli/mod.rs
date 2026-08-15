@@ -68,7 +68,7 @@ impl Cli {
 
             // moldx list [<path>] [--depth <depth>]
             Command::List { path, depth } => {
-                commands::list::list(client, path, depth).await?;
+                commands::list::list(client).await?;
             }
 
             // moldx new module ...
@@ -107,14 +107,7 @@ pub enum Command {
     },
 
     /// List all discovered modules under a root path
-    List {
-        /// Root path to scan (defaults to current directory)
-        path: Option<PathBuf>,
-
-        /// Maximum directory depth to scan
-        #[arg(long, default_value = "3")]
-        depth: usize,
-    },
+    List,
 
     /// Create a new .moldx/ template directory in the current working directory
     Init,

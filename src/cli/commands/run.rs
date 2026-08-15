@@ -10,8 +10,8 @@ pub async fn run(
 ) -> Result<()> {
     if args.len() < 2 {
         bail!(
-                    "Usage: moldx [strategy] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth"
-                );
+            "Usage: moldx [strategy] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth"
+        );
     }
     if args.len() > 3 {
         bail!("Too many arguments. Usage: moldx [strategy] <command> <path>");

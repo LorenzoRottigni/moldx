@@ -40,24 +40,15 @@ impl Template {
 impl Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let file_names = if self.file_names.is_empty() {
-            "[]".to_string()
+            "no files".to_string()
         } else {
-            format!(
-                "[{}]",
-                self.file_names
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
+            self.file_names
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
         };
 
-        write!(
-            f,
-            "Template(name: {}, dir: {}, files: {})",
-            self.name,
-            self.dir.display(),
-            file_names
-        )
+        write!(f, "{} [{}] @ {}", self.name, file_names, self.dir.display())
     }
 }

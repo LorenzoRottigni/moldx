@@ -111,34 +111,41 @@ impl MoldXClient {
 
 impl Display for MoldXClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "MoldXClient")?;
-        writeln!(f, "config: {}", self.config)?;
+        writeln!(f, "╭─ MoldX Snapshot")?;
+        writeln!(f, "│ config")?;
+        for line in self.config.to_string().lines() {
+            writeln!(f, "│   {}", line)?;
+        }
 
-        writeln!(f, "strategies:")?;
+        writeln!(f, "│")?;
+        writeln!(f, "│ strategies ({})", self.strategies.len())?;
         if self.strategies.is_empty() {
-            writeln!(f, "  []")?;
+            writeln!(f, "│   none")?;
         } else {
             for strategy in &self.strategies {
                 for line in strategy.to_string().lines() {
-                    writeln!(f, "  {}", line)?;
+                    writeln!(f, "│   {}", line)?;
                 }
             }
         }
 
-        writeln!(f, "modules:")?;
+        writeln!(f, "│")?;
+        writeln!(f, "│ modules ({})", self.modules.len())?;
         if self.modules.is_empty() {
-            writeln!(f, "  []")?;
+            writeln!(f, "│   none")?;
         } else {
             for module in &self.modules {
-                writeln!(f, "  {}", module)?;
+                writeln!(f, "│   {}", module)?;
             }
         }
 
-        writeln!(f, "executor:")?;
+        writeln!(f, "│")?;
+        writeln!(f, "│ executor")?;
         for line in self.executor.to_string().lines() {
-            writeln!(f, "  {}", line)?;
+            writeln!(f, "│   {}", line)?;
         }
 
+        writeln!(f, "╰")?;
         Ok(())
     }
 }

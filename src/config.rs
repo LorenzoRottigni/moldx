@@ -39,14 +39,14 @@ impl Display for MoldXConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "MoldXConfig(cwd: {}, moldx_dir: {}, strategies_dir: {}, bin_dir_name: {}, template_dir_name: {}, templates_dir_name: {}, modules_dir: {})",
+            "cwd: {}\nmoldx_dir: {}\nstrategies_dir: {}\nmodules_dir: {}\nlayout: {}/{}/{}",
             self.cwd.display(),
             self.moldx_dir.display(),
             self.strategies_dir.display(),
+            self.modules_dir.display(),
             self.bin_dir_name,
             self.template_dir_name,
-            self.templates_dir_name,
-            self.modules_dir.display()
+            self.templates_dir_name
         )
     }
 }

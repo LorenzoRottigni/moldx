@@ -21,25 +21,13 @@ impl Module {
 
 impl Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let strategies = if self.strategies.is_empty() {
-            "[]".to_string()
-        } else {
-            format!(
-                "[{}]",
-                self.strategies
-                    .iter()
-                    .map(|strategy| strategy.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
+        let strategy_count = self.strategies.len();
+        let strategy_label = match strategy_count {
+            0 => "no strategies".to_string(),
+            1 => "1 strategy".to_string(),
+            n => format!("{} strategies", n),
         };
 
-        write!(
-            f,
-            "Module(name: {}, dir: {}, strategies: {})",
-            self.name,
-            self.dir.display(),
-            strategies
-        )
+        write!(f, "{} [{}] @ {}", self.name, strategy_label, self.dir.display())
     }
 }

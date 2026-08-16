@@ -233,12 +233,11 @@ impl Executor {
 impl Display for Executor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let g = self.state.lock().map_err(|_| fmt::Error)?;
-        writeln!(f, "Executor(processes: {})", g.processes.len())?;
-
+        writeln!(f, "executor: {} running", g.processes.len())?;
         for process in &g.processes {
             writeln!(
                 f,
-                "  - #{} {} [{}] {} pid={:?} status={}",
+                "  #{} {} · {}/{} · pid={:?} · {}",
                 process.id,
                 process.module_path,
                 process.strategy,
@@ -247,7 +246,6 @@ impl Display for Executor {
                 process.status
             )?;
         }
-
         Ok(())
     }
 }

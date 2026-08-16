@@ -90,25 +90,40 @@ impl Strategy {
 
 impl Display for Strategy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Strategy(name: {}, dir: {})", self.name, self.dir.display())?;
-        writeln!(f, "  agnostic: {}", self.is_agnostic())?;
-        writeln!(f, "  commands:")?;
-        if self.commands.is_empty() {
-            writeln!(f, "    []")?;
+        let command_names = if self.commands.is_empty() {
+            "none".to_string()
         } else {
-            for command in &self.commands {
-                writeln!(f, "    - {}", command)?;
-            }
-        }
-        writeln!(f, "  templates:")?;
-        if self.templates.is_empty() {
-            write!(f, "    []")?;
-        } else {
-            for template in &self.templates {
-                writeln!(f, "    - {}", template)?;
-            }
-        }
+            self.commands
+                .iter()
+                .map(|command| command.name.as_str())
+                .collect::<Vec<_>>()
+                .join(" · ")
+        };
 
-        Ok(())
+        let template_names = if self.templates.is_empty() {
+            "none".to_string()
+        } else {
+            self.templates
+                .iter()
+                .map(|template| {
+                    if template.file_names.is_empty() {
+                        template.name.clone()
+                    } else {
+                        format!("{}({})", template.name, template.file_names.len())
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" · ")
+        };
+
+        writeln!(
+            f,
+            "{}{} @ {}",
+            self.name,
+            if self.is_agnostic() { " [agnostic]" } else { "" },
+            self.dir.display()
+        )?;
+        writeln!(f, "  commands: {}", command_names)?;
+        write!(f, "  templates: {}", template_names)
     }
 }

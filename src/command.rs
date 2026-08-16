@@ -34,12 +34,6 @@ impl Command {
 
 impl Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Command(name: {}, dir: {}, format: {})",
-            self.name,
-            self.dir.display(),
-            self.format
-        )
+        write!(f, "{}.{} @ {}", self.name, self.format, self.dir.display())
     }
 }

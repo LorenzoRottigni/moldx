@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::{
     collections::{HashMap, VecDeque},
+    fmt::{self, Display},
     path::Path,
     sync::{Arc, Mutex},
     time::SystemTime,
@@ -29,6 +30,12 @@ impl ProcessStatus {
 
     pub fn is_running(&self) -> bool {
         matches!(self, ProcessStatus::Running)
+    }
+}
+
+impl Display for ProcessStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label())
     }
 }
 
@@ -220,6 +227,28 @@ impl Executor {
         for id in running_ids {
             self.kill_process(id);
         }
+    }
+}
+
+impl Display for Executor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let g = self.state.lock().map_err(|_| fmt::Error)?;
+        writeln!(f, "Executor(processes: {})", g.processes.len())?;
+
+        for process in &g.processes {
+            writeln!(
+                f,
+                "  - #{} {} [{}] {} pid={:?} status={}",
+                process.id,
+                process.module_path,
+                process.strategy,
+                process.command,
+                process.pid,
+                process.status
+            )?;
+        }
+
+        Ok(())
     }
 }
 

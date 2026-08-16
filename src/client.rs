@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::collections::BTreeSet;
+use std::fmt::{self, Display};
+use std::path::Path;
 use anyhow::Result;
 use walkdir::WalkDir;
 
@@ -20,7 +22,7 @@ pub struct MoldXClient {
 impl MoldXClient {
     pub fn new(config: MoldXConfig) -> Result<Self> {
         let mut client = MoldXClient {
-            strategies: Self::resolve_strategies(config.strategies_dir.clone())?,
+            strategies: Self::resolve_strategies(&config)?,
             modules: vec![],
             config,
             executor: Executor::new()
@@ -29,13 +31,14 @@ impl MoldXClient {
         Ok(client)
     }
 
-    pub fn resolve_strategies(strategies_dir: PathBuf) -> Result<Vec<Strategy>> {
+    pub fn resolve_strategies(config: &MoldXConfig) -> Result<Vec<Strategy>> {
+        let strategies_dir = &config.strategies_dir;
         strategies_dir.exists() && strategies_dir.is_dir() || return Err(anyhow::anyhow!("Invalid strategies directory"));
-        Ok(sorted_read_dir(&strategies_dir)?
+        Ok(sorted_read_dir(strategies_dir)?
             .into_iter()
             .filter(|e| e.path().is_dir() && !is_ignored_name(&e.file_name().to_string_lossy()))
-            .filter_map(|e| Strategy::new(e.path()).ok())
-            .collect())
+            .map(|e| Strategy::new(e.path(), config))
+            .collect::<Result<Vec<_>>>()?)
     }
 
     pub fn resolve_modules(&self) -> Result<Vec<Module>> {
@@ -49,42 +52,48 @@ impl MoldXClient {
                 continue;
             }
 
-            println!("{} - {:?}", entry.path().to_string_lossy(), entry.file_type());
-            println!("len {}", self.strategies.len());
             let path = entry.path();
-            let mut matched = false;
+            let matching_strategies = self
+                .strategies
+                .iter()
+                .enumerate()
+                .filter(|(_, strategy)| !strategy.is_agnostic())
+                .filter(|(_, strategy)| strategy.templates.iter().any(|template| template.matches(path)))
+                .map(|(index, _)| index)
+                .collect::<BTreeSet<_>>();
 
-            for (i, strategy) in self.strategies.iter().enumerate() {
-                println!("strategy: {} (tc {})", strategy.name, strategy.templates.len());
-                for template in &strategy.templates {
-                    println!("template: {} {}", strategy.name, template.name);
-                    if template.matches(&path.to_path_buf()) {
-                        matched = true;
-                        if let Some(module) = modules.iter_mut().find(|m| m.dir == path) {
-                            module.strategies.push(i);
-                        } else {
-                            modules.push(Module::new(path.to_path_buf(), vec![i]));
-                        }
-                    }
-                }
+            if matching_strategies.is_empty() {
+                continue;
             }
 
-            if matched {
-                walker.skip_current_dir();
-            }
+            let canonical_path = path.canonicalize()?;
+            modules.push(Module::new(canonical_path, matching_strategies.into_iter().collect()));
         }
 
+        modules.sort_by(|a, b| a.dir.cmp(&b.dir));
         Ok(modules)
     }
 
-    pub fn strategies_for_module(&self, path: &PathBuf) -> Vec<Strategy> {
-        if let Some(module) = self.modules.iter().find(|m| m.dir == *path) {
-            module.strategies.iter()
+    pub fn strategies_for_module(&self, path: &Path) -> Vec<Strategy> {
+        let resolved_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
+        let mut strategies = if let Some(module) = self.modules.iter().find(|m| m.dir == resolved_path) {
+            module
+                .strategies
+                .iter()
                 .map(|&i| self.strategies[i].clone())
                 .collect::<Vec<Strategy>>()
         } else {
-            vec![]
+            Vec::new()
+        };
+
+        for strategy in self.get_default_strategies() {
+            if !strategies.iter().any(|existing| existing.name == strategy.name) {
+                strategies.push(strategy);
+            }
         }
+
+        strategies
     }
 
     pub fn get_strategy(&self, name: &String) -> Option<Strategy> {
@@ -96,6 +105,40 @@ impl MoldXClient {
     }
 
     pub fn get_default_strategies(&self) -> Vec<Strategy> {
-        self.strategies.iter().filter(|s| s.templates.is_empty()).cloned().collect()
+        self.strategies.iter().filter(|s| s.is_agnostic()).cloned().collect()
+    }
+}
+
+impl Display for MoldXClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "MoldXClient")?;
+        writeln!(f, "config: {}", self.config)?;
+
+        writeln!(f, "strategies:")?;
+        if self.strategies.is_empty() {
+            writeln!(f, "  []")?;
+        } else {
+            for strategy in &self.strategies {
+                for line in strategy.to_string().lines() {
+                    writeln!(f, "  {}", line)?;
+                }
+            }
+        }
+
+        writeln!(f, "modules:")?;
+        if self.modules.is_empty() {
+            writeln!(f, "  []")?;
+        } else {
+            for module in &self.modules {
+                writeln!(f, "  {}", module)?;
+            }
+        }
+
+        writeln!(f, "executor:")?;
+        for line in self.executor.to_string().lines() {
+            writeln!(f, "  {}", line)?;
+        }
+
+        Ok(())
     }
 }

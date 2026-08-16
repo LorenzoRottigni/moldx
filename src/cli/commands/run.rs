@@ -22,10 +22,25 @@ pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
         )
     };
 
-    let command: Command = if let Some(strategy) = strategy_hint {
-        client.get_strategy(&strategy).expect("Unable to retrieve strategy").get_command(&command_name).expect("Unable to retrieve command for given strategy")
+    if !path.exists() {
+        bail!("Path does not exist: {}", path.display());
+    }
+
+    let available_strategies = client.strategies_for_module(&path);
+
+    let command: Command = if let Some(strategy_name) = strategy_hint {
+        let strategy = available_strategies
+            .iter()
+            .find(|candidate| candidate.name == strategy_name)
+            .ok_or_else(|| anyhow::anyhow!("Strategy '{}' not available for {}", strategy_name, path.display()))?;
+        strategy
+            .get_command(&command_name)
+            .ok_or_else(|| anyhow::anyhow!("Command '{}' not found in strategy variant '{}'", command_name, strategy.name))?
     } else {
-        client.get_default_strategies().iter().find_map(|s| s.get_command(&command_name)).expect("Unable to retrieve command from default strategy")
+        available_strategies
+            .iter()
+            .find_map(|strategy| strategy.get_command(&command_name))
+            .ok_or_else(|| anyhow::anyhow!("Command '{}' not found for {}", command_name, path.display()))?
     };
 
     let code = client.executor.exec_blocking(&command.dir, &path).await?;

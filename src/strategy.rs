@@ -1,7 +1,8 @@
 use std::fmt::{self, Display};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use anyhow::{Result};
 
+use crate::config::MoldXConfig;
 use crate::fs::{sorted_read_dir};
 use crate::template::{Template};
 use crate::command::{Command};
@@ -15,7 +16,7 @@ pub struct Strategy {
 }
 
 impl Strategy {
-    pub fn new(strategy_dir: PathBuf) -> Result<Self> {
+    pub fn new(strategy_dir: PathBuf, config: &MoldXConfig) -> Result<Self> {
         strategy_dir.exists() && strategy_dir.is_dir() ||
             return Err(anyhow::anyhow!("Invalid strategy directory"));
         let name = strategy_dir
@@ -23,8 +24,12 @@ impl Strategy {
             .expect("Strategy directory has no file name")
             .to_string_lossy()
             .into_owned();
-        let commands = Self::resolve_commands(&strategy_dir)?;
-        let templates = Self::resolve_templates(&strategy_dir)?;
+        let commands = Self::resolve_commands(&strategy_dir, &config.bin_dir_name)?;
+        let templates = Self::resolve_templates(
+            &strategy_dir,
+            &config.template_dir_name,
+            &config.templates_dir_name,
+        )?;
         Ok(Self {
             dir: strategy_dir,
             name,
@@ -33,10 +38,12 @@ impl Strategy {
         })
     }
 
-    pub fn resolve_commands(strategy_dir: &PathBuf) -> Result<Vec<Command>> {
-        let commands_dir = strategy_dir.join("bin");
-        commands_dir.exists() && commands_dir.is_dir() ||
-            return Err(anyhow::anyhow!("Invalid strategy commands directory"));
+    pub fn resolve_commands(strategy_dir: &Path, bin_dir_name: &str) -> Result<Vec<Command>> {
+        let commands_dir = strategy_dir.join(bin_dir_name);
+        if !commands_dir.is_dir() {
+            return Ok(vec![]);
+        }
+
         Ok(sorted_read_dir(&commands_dir)?
             .into_iter()
             .filter(|e| e.path().is_file())
@@ -44,26 +51,36 @@ impl Strategy {
             .collect())
     }
 
-    pub fn resolve_templates(strategy_dir: &PathBuf) -> Result<Vec<Template>> {
-        [
-            strategy_dir.join("template"),
-            strategy_dir.join("templates"),
-        ]
-            .into_iter()
-            .filter(|dir| dir.is_dir())
-            .map(|dir| sorted_read_dir(&dir).map(|entries| entries
-                .into_iter()
-                .filter(|e| e.path().is_dir())
-                .filter_map(|e| {
-                    Template::new(
-                        e.file_name().to_string_lossy().into_owned(),
-                        e.path(),
-                    ).ok()
-                })
-                .collect::<Vec<_>>()
-            ))
-            .collect::<Result<Vec<_>>>()
-            .map(|templates| templates.into_iter().flatten().collect())
+    pub fn resolve_templates(
+        strategy_dir: &Path,
+        template_dir_name: &str,
+        templates_dir_name: &str,
+    ) -> Result<Vec<Template>> {
+        let mut templates = Vec::new();
+
+        let singular = strategy_dir.join(template_dir_name);
+        if singular.is_dir() {
+            templates.push(Template::new(template_dir_name.to_string(), singular)?);
+        }
+
+        let plural = strategy_dir.join(templates_dir_name);
+        if plural.is_dir() {
+            for entry in sorted_read_dir(&plural)? {
+                let path = entry.path();
+                if path.is_dir() {
+                    templates.push(Template::new(
+                        entry.file_name().to_string_lossy().into_owned(),
+                        path,
+                    )?);
+                }
+            }
+        }
+
+        Ok(templates)
+    }
+
+    pub fn is_agnostic(&self) -> bool {
+        self.templates.is_empty() || self.templates.iter().all(|template| template.file_names.is_empty())
     }
 
     pub fn get_command(&self, name: &String) -> Option<Command> {
@@ -73,6 +90,25 @@ impl Strategy {
 
 impl Display for Strategy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)
+        writeln!(f, "Strategy(name: {}, dir: {})", self.name, self.dir.display())?;
+        writeln!(f, "  agnostic: {}", self.is_agnostic())?;
+        writeln!(f, "  commands:")?;
+        if self.commands.is_empty() {
+            writeln!(f, "    []")?;
+        } else {
+            for command in &self.commands {
+                writeln!(f, "    - {}", command)?;
+            }
+        }
+        writeln!(f, "  templates:")?;
+        if self.templates.is_empty() {
+            write!(f, "    []")?;
+        } else {
+            for template in &self.templates {
+                writeln!(f, "    - {}", template)?;
+            }
+        }
+
+        Ok(())
     }
 }

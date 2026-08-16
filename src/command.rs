@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::fmt::{self, Display};
 
 use crate::fs::is_shell_script;
 
@@ -29,4 +30,16 @@ impl Command {
         Some(Self { name, dir: command_dir, format })
     }
 
+}
+
+impl Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Command(name: {}, dir: {}, format: {})",
+            self.name,
+            self.dir.display(),
+            self.format
+        )
+    }
 }

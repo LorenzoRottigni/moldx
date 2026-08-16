@@ -18,7 +18,7 @@ pub async fn new(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     match entity {
         Entity::Strategy => strategy::new_strategy(client, args)?,
         Entity::Template => template::new_template(client, args)?,
-        Entity::Module => module::new_module(args)?,
+        Entity::Module => module::new_module(client, args)?,
         Entity::Command => command::new_command(client, args)?
     }
 

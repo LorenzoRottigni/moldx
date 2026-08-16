@@ -14,7 +14,7 @@ pub struct Cli {
 
     #[arg(
         long = "moldx-dir",
-        env = "MOLDX_MOLDX_DIR",
+        env = "MOLDX_DIR",
         global = true,
         default_value = ".moldx"
     )]
@@ -75,7 +75,7 @@ impl Cli {
             }
 
             // moldx list [<path>] [--depth <depth>]
-            Command::List => {
+            Command::List { .. } => {
                 commands::list::list(&client).await?;
             }
 
@@ -110,7 +110,11 @@ pub enum Command {
     },
 
     /// List all discovered modules under a root path
-    List,
+    List {
+        /// Optional root path to display
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+    },
 
     /// Create a new .moldx/ template directory in the current working directory
     Init,
@@ -123,7 +127,7 @@ pub enum Command {
     /// Scaffold command scripts in .moldx/bin
     New {
         /// Arguments: either `<command>` or `<strategy> <command>`
-        #[arg(required = true, num_args = 1..=2)]
+        #[arg(required = true, num_args = 1..=3)]
         args: Vec<String>,
     },
 }

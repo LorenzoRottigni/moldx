@@ -2,68 +2,86 @@
 
 Technology-agnostic orchestration for monorepos, powered by shell scripts.
 
-moldx now treats strategies as isolated plug-and-play directories under
-`.moldx/strategies/`. Each strategy can expose command scripts, one or more
-matching templates, or both.
+**moldx** treats strategies as isolated, composable directories under `.moldx/strategies/`. Each strategy can expose command scripts, matching templates for discovery, or both. Strategies are automatically detected for any module matching their templates, enabling transparent command availability.
 
-## Install
+## Features
+
+- 🚀 **Transparent Command Discovery** — Commands from matching strategies are automatically available
+- 📦 **Template-Based Matching** — Strategies match modules by file presence (e.g., `Dockerfile` for Docker strategy)
+- 🎯 **Agnostic Strategies** — Strategies with no templates are available to all modules
+- 🖥️ **Interactive TUI** — Run commands, monitor output, and manage modules in real-time
+- 🔧 **Multi-Strategy** — Chain strategies for complex workflows
+- 📋 **Scaffolding** — Generate new modules, strategies, and templates from templates
+
+## Quick Start
+
+### Installation
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.sh | bash
 ```
 
-## Quick Start
+### Basic Setup
 
 ```bash
 # 1. Create the strategy tree
 mkdir -p .moldx/strategies/docker/template
-mkdir -p .moldx/strategies/default/template
 mkdir -p .moldx/strategies/docker/bin
 mkdir -p .moldx/strategies/default/bin
 
-# 2. Add a matching template
+# 2. Add a template (for strategy detection)
 cat > .moldx/strategies/docker/template/Dockerfile <<'EOF'
-FROM scratch
+FROM alpine:latest
 EOF
 
-# 3. Add commands for the strategy
+# 3. Add strategy commands
 cat > .moldx/strategies/docker/bin/build.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 echo "[moldx] docker/build -> $1"
+docker build -t myapp .
 EOF
 
-# 4. Add an agnostic command
-cat > .moldx/strategies/default/bin/diff.sh <<'EOF'
+# 4. Add agnostic commands (available to all modules)
+cat > .moldx/strategies/default/bin/info.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-echo "[moldx] agnostic/diff -> $1"
+echo "[moldx] info -> $1"
+pwd && ls -la
 EOF
 
 # 5. Run moldx
+moldx               # Interactive TUI mode
 moldx detect ./services/auth
-moldx build ./services/auth
-moldx diff ./services/auth
-moldx new module docker ./services/new-auth
+moldx list
+moldx run docker build ./services/auth
+moldx new module docker ./services/new-service
 ```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `moldx` or `moldx ui` | Launch interactive terminal UI (default) |
+| `moldx detect <path>` | Show strategies available for a module |
+| `moldx list` | List all discovered modules in the workspace |
+| `moldx run <strategy> <command> <path>` | Run a strategy command on a module |
+| `moldx new <type> [options]` | Scaffold a new strategy, template, module, or command |
+| `moldx init` | Initialize .moldx directory in current project |
 
 ## Concepts
 
 | Term | Meaning |
 |------|---------|
-| Module | A directory that matches at least one strategy template and has at least one runnable command |
-| Strategy | A named directory under `.moldx/strategies/` such as `docker`, `node`, or `rust` |
-| Template | A file tree used both for matching and for scaffolding new modules |
-| Command | A shell script exposed by a strategy, usually `.<strategy>/bin/<command>.sh` |
-| Agnostic strategy | Any strategy with no non-empty templates; its commands are available to every path |
-
-Template matching is filename-based. A template matches when all of its
-filenames exist directly in the target path. Empty template directories do not
-match anything and make the strategy agnostic.
+| **Module** | A directory matching at least one strategy template (has discoverable commands) |
+| **Strategy** | A named directory under `.moldx/strategies/` (e.g., `docker`, `node`, `rust`) |
+| **Template** | A file pattern used for strategy matching and new module scaffolding |
+| **Command** | A shell script exposed by a strategy, usually `<strategy>/bin/<command>.sh` |
+| **Agnostic Strategy** | A strategy with no templates; its commands are available to all modules |
 
 ## Configuration
 
-Recommended project layout:
+### Project Layout
 
 ```text
 <project-root>/
@@ -74,166 +92,129 @@ Recommended project layout:
           build.sh
           deploy.sh
           logs.sh
-          start.sh
-          stop.sh
         template/
           Dockerfile
       node/
         bin/
           build.sh
-          install.sh
-          start.sh
           test.sh
         template/
           package.json
       default/
         bin/
-          diff.sh
+          info.sh
+          validate.sh
         template/
-          .gitkeep   # optional placeholder; hidden files are ignored for matching
+          .gitkeep   # Empty template makes strategy agnostic
+  services/
+    auth/
+      Dockerfile
+      src/
+    api/
+      package.json
+      src/
 ```
 
-Supported template layouts:
+### Template Layouts
 
-- `.moldx/strategies/<strategy>/template/`
-- `.moldx/strategies/<strategy>/templates/<template-name>/`
+Strategies can use either layout:
 
-Supported command layouts:
+- Single template: `.moldx/strategies/<strategy>/template/`
+- Multiple templates: `.moldx/strategies/<strategy>/templates/<template-name>/`
 
-- `.moldx/strategies/<strategy>/bin/<command>.sh`
+### Environment Variables
 
-If a strategy has no non-empty templates, it is treated as agnostic and its
-commands are offered to every path.
+- `MOLDX_MOLDX_DIR` — Override `.moldx` directory location (default: `.moldx`)
+- `MOLDX_STRATEGIES_DIR_NAME` — Strategies subdirectory name (default: `strategies`)
+- `MOLDX_BIN_DIR_NAME` — Commands subdirectory name (default: `bin`)
+- `MOLDX_TEMPLATE_DIR_NAME` — Single template directory name (default: `template`)
+- `MOLDX_TEMPLATES_DIR_NAME` — Multiple templates directory name (default: `templates`)
 
-## CLI Reference
+## Interactive TUI
 
-### Global options
+The default mode launches an interactive terminal UI for:
 
-| Flag | Env var | Notes |
-|------|---------|-------|
-| `--moldx-dir <dir>` | `MOLDX_DIR` | Override the `.moldx/` root |
-| `--strategies-dir <dir>` | `MOLDX_STRATEGIES_DIR` | Override `.moldx/strategies/` |
-| `--bin-dir <dir>` | `MOLDX_BIN_DIR` | Compatibility alias for `--strategies-dir` |
+- **Left Panel** — Browse all modules in the workspace
+- **Middle Panel** — View available commands for selected module
+- **Right Panel** — Monitor running processes and their output
 
-### Commands
+Navigate with arrow keys:
+- `↓` / `↑` — Move between items
+- `→` / `←` — Switch panels
+- `Enter` — Execute selected command
+- `k` — Kill running process
+- `q` / `Ctrl+C` — Exit
 
-#### `moldx [strategy] <command> <path>`
+## Architecture
 
-Run a command against a module path.
+moldx v2 is built on a clean, modular architecture:
 
-Resolution order:
+- **Executor** — Shared execution runtime managing process lifecycle and I/O streaming
+- **Client** — Orchestrates strategy/module discovery and command resolution
+- **TUI** — Terminal UI leveraging the shared executor for real-time feedback
+- **CLI** — Command-line interface for scripting and automation
 
-1. If a strategy is provided explicitly, moldx uses that strategy.
-2. Otherwise, moldx finds strategies whose templates match the target path.
-3. If no strategy-specific command matches, moldx falls back to agnostic commands.
+All components share a single `Executor` instance (managed via `Arc`), ensuring consistent process management and state tracking without unnecessary cloning.
 
-Examples:
+## Project Structure
 
-```bash
-moldx docker build ./services/auth
-moldx build ./services/auth
-moldx diff ./services/auth
+```
+.
+├── src/              # v2 implementation (main)
+│   ├── main.rs       # CLI entrypoint
+│   ├── client.rs     # Core orchestration
+│   ├── executor.rs   # Shared execution runtime
+│   ├── tui.rs        # Terminal UI
+│   ├── cli/          # CLI commands
+│   └── ...           # Supporting modules
+├── v1/               # Legacy v1 implementation (archived)
+├── playground/       # Example strategies and modules
+└── tests/            # Integration tests
 ```
 
-#### `moldx detect <path>`
+## Migrating from v1
 
-Print the strategies whose templates match the path.
+The v1 codebase is preserved in the [`v1/`](./v1/) directory. The v2 refactor focuses on:
 
-```bash
-moldx detect ./services/auth
-```
-
-#### `moldx list [path] [--depth <n>]`
-
-Walk a tree and list all discovered modules, their strategies, and the commands
-available for each one.
-
-```bash
-moldx list ./services
-moldx list --depth 5
-```
-
-#### `moldx new module <strategy> [template] <path>`
-
-Scaffold a new module from a strategy template.
-
-- If the strategy exposes exactly one non-empty template, `template` can be omitted.
-- If the strategy exposes multiple templates, pick one explicitly.
-- Existing non-empty target directories are rejected to avoid accidental overwrite.
-
-```bash
-moldx new module docker ./services/new-auth
-moldx new module docker api ./services/api
-```
-
-#### `moldx`
-
-Launch the interactive terminal UI.
-
-## How It Works
-
-### Detection
-
-moldx resolves `.moldx/` starting from the current path or the configured
-override, then loads `.moldx/strategies/`.
-
-For a target path, moldx collects the direct filenames present in that path and
-checks them against each strategy template. A strategy is considered matched if
-any of its non-empty templates is a filename subset of the target path.
-
-### Command execution
-
-For `moldx [strategy] <command> <path>`:
-
-1. Validate the command and strategy names.
-2. Resolve the strategies directory.
-3. Match the target path against strategy templates.
-4. Choose the requested strategy, the best matching strategy, or an agnostic command.
-5. Execute the resulting shell script with inherited stdio.
-
-### Scaffolding
-
-`moldx new module ...` copies the selected template directory into the target
-path, preserving nested files.
-
-## User Interface
-
-`moldx` opens a three-panel TUI:
-
-- Modules
-- Commands for the selected module
-- Running processes and their output
-
-Keys:
-
-- `Tab` / `Shift+Tab` cycle focus
-- `Up` / `Down` move the selection
-- `Enter` selects a module or runs a command
-- `k` kills a running process
-- `r` refreshes the module scan
-- `q` or `Ctrl+C` quits
-
-## Playground
-
-The `playground/` directory contains a working example of the new layout:
-
-- `playground/.moldx/strategies/docker/`
-- `playground/.moldx/strategies/node/`
-- `playground/.moldx/strategies/rust/`
-- `playground/.moldx/strategies/default/`
-
-Run the example with:
-
-```bash
-MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/auth-service
-MOLDX_DIR=$PWD/playground/.moldx cargo run -- build playground/modules/auth-service
-MOLDX_DIR=$PWD/playground/.moldx cargo run -- new module docker playground/modules/scaffolded
-```
+- ✅ Unified execution model (shared `Executor` instead of duplicated state)
+- ✅ Cleaner separation of concerns (CLI, TUI, discovery, execution)
+- ✅ Better error handling and diagnostics
+- ✅ Real-time output streaming in TUI
+- ✅ Improved module and template matching logic
 
 ## Development
 
 ```bash
+# Build
+cargo build --release
+
+# Test
 cargo test
-cargo clippy -- -D warnings
-cargo fmt
+
+# Check
+cargo check
+
+# Run in dev mode
+cargo run -- detect ./services/auth
+
+# With playground
+MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/auth-service
 ```
+
+## Playground
+
+The `playground/` directory contains working examples:
+
+```bash
+MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/auth-service
+MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- list
+MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- ui
+```
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions welcome! Please open an issue or submit a PR.

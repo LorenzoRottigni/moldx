@@ -51,6 +51,14 @@ pub struct Cli {
         default_value = "template"
     )]
     pub template_dir_name: String,
+
+    #[arg(
+        long = "modules-dir",
+        env = "MOLDX_MODULES_DIR",
+        global = true,
+        default_value = "./playground"
+    )]
+    pub modules_dir: String,
 }
 
 impl Cli {

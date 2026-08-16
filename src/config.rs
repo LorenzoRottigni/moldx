@@ -8,6 +8,7 @@ pub struct MoldXConfig {
     pub bin_dir_name: String,
     pub template_dir_name: String,
     pub templates_dir_name: String,
+    pub modules_dir: PathBuf,
 }
 
 impl MoldXConfig {
@@ -17,16 +18,18 @@ impl MoldXConfig {
         bin_dir_name: String,
         template_dir_name: String,
         templates_dir_name: String,
+        modules_dir: String,
     ) -> Self {
+        let cwd = std::env::current_dir().expect("Error: unable to determine current directory:");
         let moldx_dir = PathBuf::from(_moldx_dir);
         Self {
-            cwd: std::env::current_dir().expect("Error: unable to determine current directory:"),
+            cwd,
             strategies_dir: moldx_dir.join(strategies_dir_name),
             moldx_dir,
             bin_dir_name,
             template_dir_name,
             templates_dir_name,
-            
+            modules_dir: PathBuf::from(modules_dir)
         }
     }
 }

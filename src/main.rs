@@ -22,6 +22,7 @@ async fn main() -> Result<()> {
         cli.bin_dir_name.clone(),
         cli.template_dir_name.clone(),
         cli.templates_dir_name.clone(),
+        cli.modules_dir.clone(),
     );
     let client = client::MoldXClient::new(config)?;
     cli.exec_with(client).await?;

@@ -39,9 +39,8 @@ impl MoldXClient {
     }
 
     pub fn resolve_modules(&self) -> Result<Vec<Module>> {
-        let cwd = self.config.cwd.clone();
         let mut modules: Vec<Module> = Vec::new();
-        let mut walker = WalkDir::new(&cwd).into_iter();
+        let mut walker = WalkDir::new(&self.config.modules_dir).into_iter();
 
         while let Some(entry) = walker.next() {
             let entry = entry?;
@@ -50,11 +49,15 @@ impl MoldXClient {
                 continue;
             }
 
+            println!("{} - {:?}", entry.path().to_string_lossy(), entry.file_type());
+            println!("len {}", self.strategies.len());
             let path = entry.path();
             let mut matched = false;
 
             for (i, strategy) in self.strategies.iter().enumerate() {
+                println!("strategy: {} (tc {})", strategy.name, strategy.templates.len());
                 for template in &strategy.templates {
+                    println!("template: {} {}", strategy.name, template.name);
                     if template.matches(&path.to_path_buf()) {
                         matched = true;
                         if let Some(module) = modules.iter_mut().find(|m| m.dir == path) {

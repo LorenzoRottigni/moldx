@@ -51,20 +51,17 @@ impl Strategy {
         ]
             .into_iter()
             .filter(|dir| dir.is_dir())
-            .map(|dir| {
-                sorted_read_dir(&dir).map(|entries| {
-                    entries
-                        .into_iter()
-                        .filter(|e| e.path().is_dir())
-                        .filter_map(|e| {
-                            Template::new(
-                                e.file_name().to_string_lossy().into_owned(),
-                                e.path(),
-                            ).ok()
-                        })
-                        .collect::<Vec<_>>()
+            .map(|dir| sorted_read_dir(&dir).map(|entries| entries
+                .into_iter()
+                .filter(|e| e.path().is_dir())
+                .filter_map(|e| {
+                    Template::new(
+                        e.file_name().to_string_lossy().into_owned(),
+                        e.path(),
+                    ).ok()
                 })
-            })
+                .collect::<Vec<_>>()
+            ))
             .collect::<Result<Vec<_>>>()
             .map(|templates| templates.into_iter().flatten().collect())
     }

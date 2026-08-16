@@ -43,6 +43,11 @@ impl MoldXClient {
 
     pub fn resolve_modules(&self) -> Result<Vec<Module>> {
         let mut modules: Vec<Module> = Vec::new();
+        let moldx_dir = self
+            .config
+            .moldx_dir
+            .canonicalize()
+            .unwrap_or_else(|_| self.config.moldx_dir.clone());
         let mut walker = WalkDir::new(&self.config.modules_dir).into_iter();
 
         while let Some(entry) = walker.next() {
@@ -53,6 +58,13 @@ impl MoldXClient {
             }
 
             let path = entry.path();
+            let canonical_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
+            if canonical_path.starts_with(&moldx_dir) {
+                walker.skip_current_dir();
+                continue;
+            }
+
             let matching_strategies = self
                 .strategies
                 .iter()
@@ -66,7 +78,6 @@ impl MoldXClient {
                 continue;
             }
 
-            let canonical_path = path.canonicalize()?;
             modules.push(Module::new(canonical_path, matching_strategies.into_iter().collect()));
         }
 

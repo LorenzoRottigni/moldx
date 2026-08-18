@@ -1,7 +1,9 @@
 use std::str::FromStr;
+use std::fmt;
 
 use crate::errors::MoldXError;
 
+#[derive(Debug)]
 pub enum Entity {
     Strategy,
     Template,
@@ -30,6 +32,17 @@ impl FromStr for Entity {
             "module" => Ok(Entity::Module),
             "command" => Ok(Entity::Command),
             _ => Err(MoldXError::UnknownEntity { entity: value.to_string() }),
+        }
+    }
+}
+
+impl fmt::Display for Entity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Entity::Strategy => write!(f, "strategy"),
+            Entity::Template => write!(f, "template"),
+            Entity::Module => write!(f, "module"),
+            Entity::Command => write!(f, "command"),
         }
     }
 }

@@ -28,6 +28,7 @@ impl MoldXConfig {
         let moldx_dir = PathBuf::from(_moldx_dir);
         let modules_path = PathBuf::from(&modules_dir);
         let modules_dir = modules_path.canonicalize().map_err(|_| MoldXError::Canonicalize { path: modules_path })?;
+
         Ok(Self {
             cwd,
             strategies_dir: moldx_dir.join(strategies_dir_name),

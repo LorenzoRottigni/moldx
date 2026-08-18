@@ -5,9 +5,10 @@ use owo_colors::OwoColorize;
 
 use crate::config::MoldXConfig;
 use crate::errors::MoldXError;
-use crate::fs::{sorted_read_dir};
+use crate::fs::{sorted_read_dir, validate_name};
 use crate::template::{Template};
 use crate::command::{Command};
+use crate::types::Entity;
 
 #[derive(Debug, Clone)]
 pub struct Strategy {
@@ -27,6 +28,9 @@ impl Strategy {
             .ok_or_else(|| MoldXError::StrategyDirNoFileName { path: strategy_dir.clone() })?
             .to_string_lossy()
             .into_owned();
+
+        validate_name(name.clone(), Entity::Strategy)?;
+
         let commands = Self::resolve_commands(&strategy_dir, &config.bin_dir_name)?;
         let templates = Self::resolve_templates(
             &strategy_dir,
@@ -50,7 +54,7 @@ impl Strategy {
         Ok(sorted_read_dir(&commands_dir)?
             .into_iter()
             .filter(|e| e.path().is_file())
-            .filter_map(|e| Command::new(e.path()))
+            .filter_map(|e| Some(Command::new(e.path()).ok())?)
             .collect())
     }
 

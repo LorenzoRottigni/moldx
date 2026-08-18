@@ -2,7 +2,10 @@ use std::path::PathBuf;
 use std::fmt::{self, Display};
 use owo_colors::OwoColorize;
 
-use crate::fs::is_shell_script;
+use crate::errors::MoldXError;
+use crate::fs::{is_shell_script, validate_name};
+use crate::types::Entity;
+use anyhow:: Result;
 
 #[derive(Debug, Clone)]
 pub struct Command {
@@ -12,15 +15,18 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn new(command_dir: PathBuf) -> Option<Self> {
+    pub fn new(command_dir: PathBuf) -> Result<Self> {
         if !command_dir.is_file() || !is_shell_script(&command_dir) {
-            return None;
+            return Err(MoldXError::CommandNotFound { name: "".into(), path: command_dir }.into())
         }
 
         let name = command_dir
             .file_stem()
-            .and_then(|stem| stem.to_str())?
+            .and_then(|stem| stem.to_str())
+            .ok_or(MoldXError::InvalidName { entity: Entity::Command, name: command_dir.to_string_lossy().to_string() })?
             .to_string();
+
+        validate_name(name.clone(), Entity::Command)?;
 
         let format = command_dir
             .extension()
@@ -28,7 +34,7 @@ impl Command {
             .unwrap_or("")
             .to_string();
 
-        Some(Self { name, dir: command_dir, format })
+        Ok(Self { name, dir: command_dir, format })
     }
 
 }

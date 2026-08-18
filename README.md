@@ -206,9 +206,9 @@ MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/au
 The `playground/` directory contains working examples:
 
 ```bash
-MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/auth-service
-MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- list
-MOLDX_MOLDX_DIR=$PWD/playground/.moldx cargo run -- ui
+MOLDX_DIR=$PWD/playground/.moldx cargo run -- detect playground/modules/auth-service
+MOLDX_DIR=$PWD/playground/.moldx cargo run -- list
+MOLDX_DIR=$PWD/playground/.moldx cargo run -- ui
 ```
 
 ## License

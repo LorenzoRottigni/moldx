@@ -17,4 +17,5 @@
 - the binary contract is portable and can be passed to the moldx command on whatever host to act as a .moldx dir
 - another use case for this is to hold inside a container just the built .moldx dir and not the itself
 - .binary contract can be also deserialized back into a .moldx dir
-- this can introduce a plugins system where strategies are built and published somewhere and then the consumer pulls and use thems
+- this can introduce a plugins system where strategies are built and published somewhere and then the consumer pulls and use them
+

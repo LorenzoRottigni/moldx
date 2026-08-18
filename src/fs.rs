@@ -1,6 +1,7 @@
-use std::{collections::BTreeSet, path::{Path, PathBuf}};
-use anyhow::Result;
-use walkdir::WalkDir;
+use std::{collections::BTreeSet, path::{Path}};
+use anyhow::{Result, bail};
+use crate::{errors::MoldXError, types::Entity};
+
 
 pub fn sorted_read_dir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
     let mut entries = std::fs::read_dir(path)?.collect::<std::result::Result<Vec<_>, _>>()?;
@@ -41,4 +42,13 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     }
 
     Ok(names)
+}
+
+pub fn validate_name(name: String, entity: Entity) -> Result<()> {
+    if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
+        bail!(
+            MoldXError::InvalidName { name, entity }
+        );
+    }
+    Ok(())
 }

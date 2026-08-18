@@ -74,7 +74,7 @@ impl Cli {
                 commands::detect::detect(&client, path).await?;
             }
 
-            // moldx list [<path>] [--depth <depth>]
+            // moldx list [<path>]
             Command::List { .. } => {
                 commands::list::list(&client).await?;
             }

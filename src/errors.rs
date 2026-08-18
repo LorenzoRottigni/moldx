@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
+use crate::types::Entity;
+
 #[derive(Error, Debug)]
 pub enum MoldXError {
     #[error("unable to determine current directory")]
@@ -11,6 +13,9 @@ pub enum MoldXError {
 
     #[error("invalid strategy directory: {path}")]
     InvalidStrategyDir { path: PathBuf },
+
+    #[error("Invalid {entity} name: {name}")]
+    InvalidName { entity: Entity, name: String },
 
     #[error("strategy directory has no file name: {path}")]
     StrategyDirNoFileName { path: PathBuf },

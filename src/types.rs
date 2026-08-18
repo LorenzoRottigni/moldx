@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use crate::errors::MoldXError;
+
 pub enum Entity {
     Strategy,
     Template,
@@ -19,7 +21,7 @@ impl Entity {
 }
 
 impl FromStr for Entity {
-    type Err = String;
+    type Err = MoldXError;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
@@ -27,7 +29,7 @@ impl FromStr for Entity {
             "template" => Ok(Entity::Template),
             "module" => Ok(Entity::Module),
             "command" => Ok(Entity::Command),
-            _ => Err(format!("Unknown entity: {value}")),
+            _ => Err(MoldXError::UnknownEntity { entity: value.to_string() }),
         }
     }
 }

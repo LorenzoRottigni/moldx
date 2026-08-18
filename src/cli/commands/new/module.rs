@@ -3,22 +3,22 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use walkdir::WalkDir;
 
-use crate::{client::MoldXClient, template::Template};
+use crate::{client::MoldXClient, errors::MoldXError, template::Template};
 
 pub fn new_module(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     let (strategy_name, template_name, module_index) = match args.len() {
         2 => (None, None, 1),
         3 => (Some(args[1].clone()), None, 2),
         4 => (Some(args[1].clone()), Some(args[2].clone()), 3),
-        _ => bail!("Usage: moldx new module [strategy] [template] <module-path>"),
+        _ => return Err(MoldXError::NewModuleUsage.into()),
     };
 
     let module_path = PathBuf::from(&args[module_index]);
     if module_path.exists() {
-        bail!("Module path already exists: {}", module_path.display());
+        return Err(MoldXError::ModulePathAlreadyExists { path: module_path }.into());
     }
 
     fs::create_dir_all(&module_path)?;
@@ -26,7 +26,7 @@ pub fn new_module(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if let Some(strategy_name) = strategy_name {
         let strategy = client
             .get_strategy(&strategy_name)
-            .ok_or_else(|| anyhow::anyhow!("Strategy not found: {}", strategy_name))?;
+            .ok_or_else(|| MoldXError::StrategyNotFound { name: strategy_name })?;
         let template = select_template(&strategy, template_name.as_deref())?;
         scaffold_template_dir(&template.dir, &module_path)?;
         println!(
@@ -57,14 +57,11 @@ fn select_template(strategy: &crate::strategy::Strategy, template_name: Option<&
             .iter()
             .find(|template| template.name == name && !template.file_names.is_empty())
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Template not found: {} for strategy {}", name, strategy.name)),
+            .ok_or_else(|| MoldXError::TemplateNotFound { name: name.to_string(), strategy: strategy.name.clone() }.into()),
         None => match templates.as_slice() {
             [template] => Ok(template.clone()),
-            [] => bail!("Strategy '{}' does not expose a scaffoldable template.", strategy.name),
-            _ => bail!(
-                "Strategy '{}' exposes multiple templates. Pick one explicitly.",
-                strategy.name
-            ),
+            [] => Err(MoldXError::NoScaffoldableTemplate { name: strategy.name.clone() }.into()),
+            _ => Err(MoldXError::MultipleTemplates { name: strategy.name.clone() }.into()),
         },
     }
 }

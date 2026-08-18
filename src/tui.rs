@@ -20,6 +20,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use crate::{
     client::MoldXClient,
     command::Command,
+    errors::MoldXError,
     executor::{self, Executor},
     module::Module,
 };
@@ -441,7 +442,7 @@ pub async fn run(client: &MoldXClient) -> Result<()> {
         {
             let terminal = session
                 .terminal_mut()
-                .expect("terminal should remain available during TUI run");
+                .ok_or(MoldXError::TerminalUnavailable)?;
             terminal.draw(|f| draw(f, &mut app))?;
         }
 

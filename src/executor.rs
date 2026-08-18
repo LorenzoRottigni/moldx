@@ -9,6 +9,8 @@ use std::{
 };
 use tokio::process::{Child, Command};
 
+use crate::errors::MoldXError;
+
 type PID = u32;
 
 #[derive(Debug, Clone)]
@@ -108,9 +110,10 @@ impl Executor {
         let child = Command::new("bash")
             .arg(script)
             .arg(module_path)
-            .spawn()?;
+            .spawn()
+            .map_err(|e| MoldXError::ProcessSpawnFailed { reason: e.to_string() })?;
 
-        let pid = child.id().unwrap();
+        let pid = child.id().ok_or_else(|| MoldXError::ProcessSpawnFailed { reason: "failed to get process ID".to_string() })?;
         self.processes.insert(pid, child);
         Ok(pid)
     }

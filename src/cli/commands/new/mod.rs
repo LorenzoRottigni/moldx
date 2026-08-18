@@ -3,17 +3,16 @@ mod module;
 mod strategy;
 mod template;
 
-use crate::{client::MoldXClient, types::Entity};
-use anyhow::{anyhow, bail, Result};
+use crate::{client::MoldXClient, types::Entity, errors::MoldXError};
+use anyhow::Result;
 
 pub async fn new(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if args.is_empty() {
-        bail!("Usage: moldx new <strategy|template|module|command> ...");
+        return Err(MoldXError::NewUsage.into());
     }
 
     let entity = args[0]
-        .parse::<Entity>()
-        .map_err(|err| anyhow!(err))?;
+        .parse::<Entity>()?;
 
     match entity {
         Entity::Strategy => strategy::new_strategy(client, args)?,

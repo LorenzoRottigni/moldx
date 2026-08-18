@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::fmt::{self, Display};
 use owo_colors::OwoColorize;
 
+use crate::errors::MoldXError;
+
 #[derive(Clone, Debug)]
 pub struct Module {
     pub name: String,
@@ -10,17 +12,17 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn new(dir: PathBuf, strategies: Vec<usize>) -> Self {
+    pub fn new(dir: PathBuf, strategies: Vec<usize>) -> Result<Self, MoldXError> {
         let name = dir
             .file_name()
-            .expect("Strategy directory has no file name")
+            .ok_or_else(|| MoldXError::ModuleDirNoFileName { path: dir.clone() })?
             .to_string_lossy()
             .into_owned();
-        Self {
+        Ok(Self {
             name,
             dir,
             strategies
-        }
+        })
     }
 }
 

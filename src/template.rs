@@ -5,6 +5,7 @@ use owo_colors::OwoColorize;
 
 use anyhow::Result;
 
+use crate::errors::MoldXError;
 use crate::fs::file_names_for_dir;
 
 #[derive(Debug, Clone)]
@@ -16,8 +17,9 @@ pub struct Template {
 
 impl Template {
     pub fn new(name: String, template_dir: PathBuf) -> Result<Self> {
-        template_dir.exists() && template_dir.is_dir() ||
-            return Err(anyhow::anyhow!("Invalid template directory"));
+        if !template_dir.exists() || !template_dir.is_dir() {
+            return Err(MoldXError::InvalidTemplateDir { path: template_dir }.into());
+        }
         Ok(Self {
             name,
             file_names: file_names_for_dir(&template_dir)?,

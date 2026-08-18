@@ -8,6 +8,7 @@ pub mod template;
 pub mod command;
 pub mod config;
 pub mod cli;
+pub mod errors;
 pub mod executor;
 pub mod module;
 pub mod types;
@@ -23,7 +24,7 @@ async fn main() -> Result<()> {
         cli.template_dir_name.clone(),
         cli.templates_dir_name.clone(),
         cli.modules_dir.clone(),
-    );
+    )?;
     let client = client::MoldXClient::new(config)?;
     print!("{}", client);
     cli.exec_with(client).await?;

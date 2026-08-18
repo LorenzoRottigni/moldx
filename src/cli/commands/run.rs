@@ -1,15 +1,13 @@
-use crate::{client::MoldXClient, command::Command};
-use anyhow::{bail, Result};
+use crate::{client::MoldXClient, command::Command, errors::MoldXError};
+use anyhow::Result;
 
 
 pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if args.len() < 2 {
-        bail!(
-            "Usage: moldx [strategy] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth"
-        );
+        return Err(MoldXError::RunUsage.into());
     }
     if args.len() > 3 {
-        bail!("Too many arguments. Usage: moldx [strategy] <command> <path>");
+        return Err(MoldXError::TooManyArguments.into());
     }
 
     let (strategy_hint, command_name, path) = if args.len() == 2 {
@@ -23,7 +21,7 @@ pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     };
 
     if !path.exists() {
-        bail!("Path does not exist: {}", path.display());
+        return Err(MoldXError::PathNotFound { path }.into());
     }
 
     let available_strategies = client.strategies_for_module(&path);
@@ -32,15 +30,15 @@ pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
         let strategy = available_strategies
             .iter()
             .find(|candidate| candidate.name == strategy_name)
-            .ok_or_else(|| anyhow::anyhow!("Strategy '{}' not available for {}", strategy_name, path.display()))?;
+            .ok_or_else(|| MoldXError::StrategyNotAvailable { name: strategy_name, path: path.clone() })?;
         strategy
             .get_command(&command_name)
-            .ok_or_else(|| anyhow::anyhow!("Command '{}' not found in strategy variant '{}'", command_name, strategy.name))?
+            .ok_or_else(|| MoldXError::CommandNotFoundInStrategy { name: command_name, strategy: strategy.name.clone() })?
     } else {
         available_strategies
             .iter()
             .find_map(|strategy| strategy.get_command(&command_name))
-            .ok_or_else(|| anyhow::anyhow!("Command '{}' not found for {}", command_name, path.display()))?
+            .ok_or_else(|| MoldXError::CommandNotFound { name: command_name, path: path.clone() })?
     };
 
     let code = client.executor.exec_blocking(&command.dir, &path).await?;

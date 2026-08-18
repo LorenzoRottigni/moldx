@@ -4,6 +4,7 @@ use anyhow::{Result};
 use owo_colors::OwoColorize;
 
 use crate::config::MoldXConfig;
+use crate::errors::MoldXError;
 use crate::fs::{sorted_read_dir};
 use crate::template::{Template};
 use crate::command::{Command};
@@ -18,11 +19,12 @@ pub struct Strategy {
 
 impl Strategy {
     pub fn new(strategy_dir: PathBuf, config: &MoldXConfig) -> Result<Self> {
-        strategy_dir.exists() && strategy_dir.is_dir() ||
-            return Err(anyhow::anyhow!("Invalid strategy directory"));
+        if !strategy_dir.exists() || !strategy_dir.is_dir() {
+            return Err(MoldXError::InvalidStrategyDir { path: strategy_dir }.into());
+        }
         let name = strategy_dir
             .file_name()
-            .expect("Strategy directory has no file name")
+            .ok_or_else(|| MoldXError::StrategyDirNoFileName { path: strategy_dir.clone() })?
             .to_string_lossy()
             .into_owned();
         let commands = Self::resolve_commands(&strategy_dir, &config.bin_dir_name)?;

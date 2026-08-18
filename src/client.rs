@@ -6,6 +6,7 @@ use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::MoldXConfig;
+use crate::errors::MoldXError;
 use crate::executor::Executor;
 use crate::strategy::{Strategy};
 use crate::fs::{sorted_read_dir, is_ignored_name};
@@ -34,7 +35,9 @@ impl MoldXClient {
 
     pub fn resolve_strategies(config: &MoldXConfig) -> Result<Vec<Strategy>> {
         let strategies_dir = &config.strategies_dir;
-        strategies_dir.exists() && strategies_dir.is_dir() || return Err(anyhow::anyhow!("Invalid strategies directory"));
+        if !strategies_dir.exists() || !strategies_dir.is_dir() {
+            return Err(MoldXError::InvalidStrategiesDir { path: strategies_dir.clone() }.into());
+        }
         Ok(sorted_read_dir(strategies_dir)?
             .into_iter()
             .filter(|e| e.path().is_dir() && !is_ignored_name(&e.file_name().to_string_lossy()))
@@ -79,7 +82,9 @@ impl MoldXClient {
                 continue;
             }
 
-            modules.push(Module::new(canonical_path, matching_strategies.into_iter().collect()));
+            if let Ok(module) = Module::new(canonical_path, matching_strategies.into_iter().collect()) {
+                modules.push(module);
+            }
         }
 
         modules.sort_by(|a, b| a.dir.cmp(&b.dir));

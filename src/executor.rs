@@ -1,4 +1,5 @@
 use anyhow::Result;
+use owo_colors::OwoColorize;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{self, Display},
@@ -35,7 +36,12 @@ impl ProcessStatus {
 
 impl Display for ProcessStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.label())
+        match self {
+            ProcessStatus::Running => write!(f, "{}", "Running".yellow()),
+            ProcessStatus::Completed(code) => write!(f, "{}", format!("Done({})", code).green()),
+            ProcessStatus::Failed(msg) => write!(f, "{}", format!("Failed: {}", msg).red()),
+            ProcessStatus::Killed => write!(f, "{}", "Killed".red()),
+        }
     }
 }
 
@@ -233,15 +239,15 @@ impl Executor {
 impl Display for Executor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let g = self.state.lock().map_err(|_| fmt::Error)?;
-        writeln!(f, "executor: {} running", g.processes.len())?;
+        writeln!(f, "{} {}", "executor:".bold().yellow(), format!("{} running", g.processes.len()))?;
         for process in &g.processes {
             writeln!(
                 f,
-                "  #{} {} · {}/{} · pid={:?} · {}",
-                process.id,
-                process.module_path,
-                process.strategy,
-                process.command,
+                "  {} {} · {}/{} · pid={:?} · {}",
+                format!("#{}", process.id).dimmed(),
+                process.module_path.green(),
+                process.strategy.cyan(),
+                process.command.cyan(),
                 process.pid,
                 process.status
             )?;

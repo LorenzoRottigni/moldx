@@ -25,6 +25,7 @@ async fn main() -> Result<()> {
         cli.modules_dir.clone(),
     );
     let client = client::MoldXClient::new(config)?;
+    print!("{}", client);
     cli.exec_with(client).await?;
     Ok(())
 }

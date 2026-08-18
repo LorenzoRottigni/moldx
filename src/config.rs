@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::fmt::{self, Display};
+use owo_colors::OwoColorize;
 
 #[derive(Debug, Clone)]
 pub struct MoldXConfig {
@@ -30,23 +31,16 @@ impl MoldXConfig {
             bin_dir_name,
             template_dir_name,
             templates_dir_name,
-            modules_dir: PathBuf::from(modules_dir)
+            modules_dir: PathBuf::from(modules_dir).canonicalize().expect("Error: unable to canonicalize modules_dir")
         }
     }
 }
 
 impl Display for MoldXConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "cwd: {}\nmoldx_dir: {}\nstrategies_dir: {}\nmodules_dir: {}\nlayout: {}/{}/{}",
-            self.cwd.display(),
-            self.moldx_dir.display(),
-            self.strategies_dir.display(),
-            self.modules_dir.display(),
-            self.bin_dir_name,
-            self.template_dir_name,
-            self.templates_dir_name
-        )
+        writeln!(f, "{} {}", "cwd:".bold().blue(), self.cwd.display())?;
+        writeln!(f, "{} {}", "moldx_dir:".bold().blue(), self.moldx_dir.display())?;
+        writeln!(f, "{} {}", "strategies_dir:".bold().blue(), self.strategies_dir.display())?;
+        writeln!(f, "{} {}", "modules_dir:".bold().blue(), self.modules_dir.display())
     }
 }

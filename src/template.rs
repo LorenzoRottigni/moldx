@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
+use owo_colors::OwoColorize;
 
 use anyhow::Result;
 
@@ -40,15 +41,21 @@ impl Template {
 impl Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let file_names = if self.file_names.is_empty() {
-            "no files".to_string()
+            "no files".italic().dimmed().to_string()
         } else {
             self.file_names
                 .iter()
-                .map(String::as_str)
+                .map(|n| n.cyan().to_string())
                 .collect::<Vec<_>>()
-                .join(", ")
+                .join(&", ".dimmed().to_string())
         };
 
-        write!(f, "{} [{}] @ {}", self.name, file_names, self.dir.display())
+        write!(
+            f,
+            "{} [{}] {}",
+            self.name.bold().magenta(),
+            file_names,
+            format!("@ {}", self.dir.display()).dimmed()
+        )
     }
 }

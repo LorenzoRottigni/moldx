@@ -1,6 +1,7 @@
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 use anyhow::{Result};
+use owo_colors::OwoColorize;
 
 use crate::config::MoldXConfig;
 use crate::fs::{sorted_read_dir};
@@ -91,39 +92,39 @@ impl Strategy {
 impl Display for Strategy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let command_names = if self.commands.is_empty() {
-            "none".to_string()
+            "none".italic().dimmed().to_string()
         } else {
             self.commands
                 .iter()
-                .map(|command| command.name.as_str())
+                .map(|command| command.name.cyan().to_string())
                 .collect::<Vec<_>>()
-                .join(" · ")
+                .join(&" · ".dimmed().to_string())
         };
 
         let template_names = if self.templates.is_empty() {
-            "none".to_string()
+            "none".italic().dimmed().to_string()
         } else {
             self.templates
                 .iter()
                 .map(|template| {
                     if template.file_names.is_empty() {
-                        template.name.clone()
+                        template.name.magenta().to_string()
                     } else {
-                        format!("{}({})", template.name, template.file_names.len())
+                        format!("{}{}", template.name.magenta(), format!("({})", template.file_names.len()).dimmed())
                     }
                 })
                 .collect::<Vec<_>>()
-                .join(" · ")
+                .join(&" · ".dimmed().to_string())
         };
 
         writeln!(
             f,
-            "{}{} @ {}",
-            self.name,
-            if self.is_agnostic() { " [agnostic]" } else { "" },
-            self.dir.display()
+            "{}{} {}",
+            self.name.bold().green(),
+            if self.is_agnostic() { format!(" {}", "[agnostic]".yellow()) } else { String::new() },
+            format!("@ {}", self.dir.display()).dimmed()
         )?;
-        writeln!(f, "  commands: {}", command_names)?;
-        write!(f, "  templates: {}", template_names)
+        writeln!(f, "  {}: {}", "commands".dimmed(), command_names)?;
+        write!(f, "  {}: {}", "templates".dimmed(), template_names)
     }
 }

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::fmt::{self, Display};
+use owo_colors::OwoColorize;
 
 use crate::fs::is_shell_script;
 
@@ -34,6 +35,13 @@ impl Command {
 
 impl Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{} @ {}", self.name, self.format, self.dir.display())
+        write!(
+            f,
+            "{}{}{} {}",
+            self.name.bold().cyan(),
+            ".".dimmed(),
+            self.format.yellow(),
+            format!("@ {}", self.dir.display()).dimmed()
+        )
     }
 }

@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fmt::{self, Display};
 use std::path::Path;
 use anyhow::Result;
+use owo_colors::OwoColorize;
 use walkdir::WalkDir;
 
 use crate::config::MoldXConfig;
@@ -122,41 +123,41 @@ impl MoldXClient {
 
 impl Display for MoldXClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "╭─ MoldX Snapshot")?;
-        writeln!(f, "│ config")?;
+        writeln!(f, "{} {}", "╭─".dimmed(), "MoldX Snapshot".bold().cyan())?;
+        writeln!(f, "{} {}", "│".dimmed(), "config".bold().yellow())?;
         for line in self.config.to_string().lines() {
-            writeln!(f, "│   {}", line)?;
+            writeln!(f, "{}   {}", "│".dimmed(), line)?;
         }
 
-        writeln!(f, "│")?;
-        writeln!(f, "│ strategies ({})", self.strategies.len())?;
+        writeln!(f, "{}", "│".dimmed())?;
+        writeln!(f, "{} {} ({})", "│".dimmed(), "strategies".bold().yellow(), self.strategies.len())?;
         if self.strategies.is_empty() {
-            writeln!(f, "│   none")?;
+            writeln!(f, "{}   {}", "│".dimmed(), "none".italic().dimmed())?;
         } else {
             for strategy in &self.strategies {
                 for line in strategy.to_string().lines() {
-                    writeln!(f, "│   {}", line)?;
+                    writeln!(f, "{}   {}", "│".dimmed(), line)?;
                 }
             }
         }
 
-        writeln!(f, "│")?;
-        writeln!(f, "│ modules ({})", self.modules.len())?;
+        writeln!(f, "{}", "│".dimmed())?;
+        writeln!(f, "{} {} ({})", "│".dimmed(), "modules".bold().yellow(), self.modules.len())?;
         if self.modules.is_empty() {
-            writeln!(f, "│   none")?;
+            writeln!(f, "{}   {}", "│".dimmed(), "none".italic().dimmed())?;
         } else {
             for module in &self.modules {
-                writeln!(f, "│   {}", module)?;
+                writeln!(f, "{}   {}", "│".dimmed(), module)?;
             }
         }
 
-        writeln!(f, "│")?;
-        writeln!(f, "│ executor")?;
+        writeln!(f, "{}", "│".dimmed())?;
+        writeln!(f, "{} {}", "│".dimmed(), "executor".bold().yellow())?;
         for line in self.executor.to_string().lines() {
-            writeln!(f, "│   {}", line)?;
+            writeln!(f, "{}   {}", "│".dimmed(), line)?;
         }
 
-        writeln!(f, "╰")?;
+        writeln!(f, "{}", "╰".dimmed())?;
         Ok(())
     }
 }

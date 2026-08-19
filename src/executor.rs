@@ -13,7 +13,7 @@ use crate::errors::MoldXError;
 
 type PID = u32;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProcessStatus {
     Running,
     Completed(i32),
@@ -256,6 +256,288 @@ impl Display for Executor {
             )?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_status_label() {
+        assert_eq!(ProcessStatus::Running.label(), "Running");
+        assert_eq!(ProcessStatus::Completed(0).label(), "Done(0)");
+        assert_eq!(ProcessStatus::Completed(1).label(), "Done(1)");
+        assert_eq!(ProcessStatus::Failed("timeout".into()).label(), "Failed: timeout");
+        assert_eq!(ProcessStatus::Killed.label(), "Killed");
+    }
+
+    #[test]
+    fn test_process_status_is_running() {
+        assert!(ProcessStatus::Running.is_running());
+        assert!(!ProcessStatus::Completed(0).is_running());
+        assert!(!ProcessStatus::Failed("x".into()).is_running());
+        assert!(!ProcessStatus::Killed.is_running());
+    }
+
+    #[test]
+    fn test_process_status_display() {
+        let display = ProcessStatus::Running.to_string();
+        assert!(display.contains("Running"));
+        let display = ProcessStatus::Completed(0).to_string();
+        assert!(display.contains("Done(0)"));
+        let display = ProcessStatus::Failed("err".into()).to_string();
+        assert!(display.contains("Failed: err"));
+        let display = ProcessStatus::Killed.to_string();
+        assert!(display.contains("Killed"));
+    }
+
+    #[test]
+    fn test_executor_new() {
+        let executor = Executor::new();
+        assert!(executor.processes.is_empty());
+        assert!(executor.get_summaries().is_empty());
+    }
+
+    #[test]
+    fn test_executor_clone() {
+        let executor = Executor::new();
+        let cloned = executor.clone();
+        assert!(cloned.processes.is_empty());
+    }
+
+    #[test]
+    fn test_add_process() {
+        let executor = Executor::new();
+        let id = executor.add_process("/path/to/module", "docker", "build", Some(1234));
+        assert_eq!(id, 0);
+        let summaries = executor.get_summaries();
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].module_path, "/path/to/module");
+        assert_eq!(summaries[0].strategy, "docker");
+        assert_eq!(summaries[0].command, "build");
+        assert_eq!(summaries[0].pid, Some(1234));
+        assert!(summaries[0].status.is_running());
+    }
+
+    #[test]
+    fn test_add_process_increments_id() {
+        let executor = Executor::new();
+        let id1 = executor.add_process("a", "s", "c", None);
+        let id2 = executor.add_process("b", "s", "c", None);
+        assert_eq!(id1, 0);
+        assert_eq!(id2, 1);
+        assert_eq!(executor.get_summaries().len(), 2);
+    }
+
+    #[test]
+    fn test_update_pid() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", None);
+        executor.update_pid(id, Some(5678));
+        assert_eq!(executor.get_summaries()[0].pid, Some(5678));
+    }
+
+    #[test]
+    fn test_update_pid_nonexistent() {
+        let executor = Executor::new();
+        executor.update_pid(999, Some(1));
+    }
+
+    #[test]
+    fn test_update_status() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", None);
+        executor.update_status(id, ProcessStatus::Completed(0));
+        assert!(!executor.get_summaries()[0].status.is_running());
+        assert_eq!(executor.get_summaries()[0].status.label(), "Done(0)");
+    }
+
+    #[test]
+    fn test_update_status_nonexistent() {
+        let executor = Executor::new();
+        executor.update_status(999, ProcessStatus::Killed);
+    }
+
+    #[test]
+    fn test_append_output() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", None);
+        executor.append_output(id, "line1".into());
+        executor.append_output(id, "line2".into());
+        let output = executor.get_output(id);
+        assert_eq!(output.len(), 2);
+        assert_eq!(output[0], "line1");
+        assert_eq!(output[1], "line2");
+    }
+
+    #[test]
+    fn test_append_output_500_cap() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", None);
+        for i in 0..600 {
+            executor.append_output(id, format!("line{}", i));
+        }
+        let output = executor.get_output(id);
+        assert_eq!(output.len(), 500);
+        assert_eq!(output[0], "line100");
+        assert_eq!(output[499], "line599");
+    }
+
+    #[test]
+    fn test_append_output_nonexistent() {
+        let executor = Executor::new();
+        executor.append_output(999, "x".into());
+    }
+
+    #[test]
+    fn test_get_output_nonexistent() {
+        let executor = Executor::new();
+        let output = executor.get_output(999);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_get_summaries_empty() {
+        let executor = Executor::new();
+        assert!(executor.get_summaries().is_empty());
+    }
+
+    #[test]
+    fn test_kill_process() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", Some(99999));
+        executor.kill_process(id);
+        assert_eq!(executor.get_summaries()[0].status, ProcessStatus::Killed);
+    }
+
+    #[test]
+    fn test_kill_process_no_pid() {
+        let executor = Executor::new();
+        let id = executor.add_process("/m", "s", "c", None);
+        executor.kill_process(id);
+        assert_eq!(executor.get_summaries()[0].status, ProcessStatus::Killed);
+    }
+
+    #[test]
+    fn test_kill_all_running() {
+        let executor = Executor::new();
+        let id1 = executor.add_process("/m1", "s", "c", None);
+        let id2 = executor.add_process("/m2", "s", "c", None);
+        let id3 = executor.add_process("/m3", "s", "c", None);
+        executor.update_status(id2, ProcessStatus::Completed(0));
+        executor.kill_all_running();
+        let summaries = executor.get_summaries();
+        assert_eq!(summaries.iter().find(|s| s.id == id1).unwrap().status, ProcessStatus::Killed);
+        assert!(summaries.iter().find(|s| s.id == id2).unwrap().status.is_running() == false);
+        assert_eq!(summaries.iter().find(|s| s.id == id3).unwrap().status, ProcessStatus::Killed);
+    }
+
+    #[test]
+    fn test_executor_display() {
+        let executor = Executor::new();
+        let _id = executor.add_process("/m", "s", "c", Some(123));
+        let display = executor.to_string();
+        assert!(display.contains("1 running"));
+        assert!(display.contains("/m"));
+    }
+
+    #[test]
+    fn test_executor_display_empty() {
+        let executor = Executor::new();
+        let display = executor.to_string();
+        assert!(display.contains("0 running"));
+    }
+
+    #[tokio::test]
+    async fn test_exec_blocking_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("test.sh");
+        std::fs::write(&script, "#!/bin/bash\nexit 0").unwrap();
+        let executor = Executor::new();
+        let code = executor.exec_blocking(&script, dir.path()).await.unwrap();
+        assert_eq!(code, 0);
+    }
+
+    #[tokio::test]
+    async fn test_exec_blocking_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("fail.sh");
+        std::fs::write(&script, "#!/bin/bash\nexit 42").unwrap();
+        let executor = Executor::new();
+        let code = executor.exec_blocking(&script, dir.path()).await.unwrap();
+        assert_eq!(code, 42);
+    }
+
+    #[tokio::test]
+    async fn test_exec_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("run.sh");
+        std::fs::write(&script, "#!/bin/bash\nsleep 0.1").unwrap();
+        let mut executor = Executor::new();
+        let pid = executor.exec(&script, dir.path()).await.unwrap();
+        assert!(pid > 0);
+    }
+
+    #[tokio::test]
+    async fn test_exec_nonexistent_script() {
+        let mut executor = Executor::new();
+        let result = executor.exec(
+            std::path::Path::new("/nonexistent/script.sh"),
+            std::path::Path::new("/tmp"),
+        ).await;
+        if let Ok(pid) = result {
+            assert!(pid > 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_run_and_track_success() {
+        use std::sync::Arc;
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("track.sh");
+        std::fs::write(&script, "#!/bin/bash\necho hello").unwrap();
+        let executor = Arc::new(Executor::new());
+        let id = executor.add_process("/m", "s", "c", None);
+        run_and_track(executor.clone(), id, script, dir.path().to_path_buf()).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let summary = &executor.get_summaries()[0];
+        assert!(!summary.status.is_running());
+        assert_eq!(summary.status.label(), "Done(0)");
+        let output = executor.get_output(id);
+        assert!(output.iter().any(|l| l.contains("hello")));
+    }
+
+    #[tokio::test]
+    async fn test_run_and_track_failure() {
+        use std::sync::Arc;
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("fail_track.sh");
+        std::fs::write(&script, "#!/bin/bash\necho err >&2\nexit 1").unwrap();
+        let executor = Arc::new(Executor::new());
+        let id = executor.add_process("/m", "s", "c", None);
+        run_and_track(executor.clone(), id, script, dir.path().to_path_buf()).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let summary = &executor.get_summaries()[0];
+        assert!(!summary.status.is_running());
+        let output = executor.get_output(id);
+        assert!(output.iter().any(|l| l.contains("[err]")));
+    }
+
+    #[tokio::test]
+    async fn test_run_and_track_spawn_failure() {
+        use std::sync::Arc;
+        let executor = Arc::new(Executor::new());
+        let id = executor.add_process("/m", "s", "c", None);
+        run_and_track(
+            executor.clone(),
+            id,
+            std::path::PathBuf::from("/nonexistent/script.sh"),
+            std::path::PathBuf::from("/tmp"),
+        ).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let summary = &executor.get_summaries()[0];
+        assert!(!summary.status.is_running());
     }
 }
 

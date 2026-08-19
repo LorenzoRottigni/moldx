@@ -63,3 +63,121 @@ impl Display for Template {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    #[test]
+    fn test_template_new_valid() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        let t = Template::new("docker".into(), tpl_dir.clone()).unwrap();
+        assert_eq!(t.name, "docker");
+        assert_eq!(t.dir, tpl_dir);
+        assert!(t.file_names.contains("Dockerfile"));
+    }
+
+    #[test]
+    fn test_template_new_invalid_dir() {
+        let result = Template::new("x".into(), PathBuf::from("/nonexistent"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_template_new_file_not_dir() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("not_a_dir");
+        fs::write(&file, "").unwrap();
+        let result = Template::new("x".into(), file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_template_new_invalid_name() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        let result = Template::new("../escape".into(), tpl_dir);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_template_matches_subset() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        let t = Template::new("docker".into(), tpl_dir).unwrap();
+
+        let target = dir.path().join("module");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("Dockerfile"), "").unwrap();
+        fs::write(target.join("main.rs"), "").unwrap();
+        assert!(t.matches(&target));
+    }
+
+    #[test]
+    fn test_template_matches_not_subset() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        fs::write(tpl_dir.join("docker-compose.yml"), "").unwrap();
+        let t = Template::new("docker".into(), tpl_dir).unwrap();
+
+        let target = dir.path().join("module");
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("Dockerfile"), "").unwrap();
+        assert!(!t.matches(&target));
+    }
+
+    #[test]
+    fn test_template_matches_empty_file_names() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        let t = Template::new("empty".into(), tpl_dir).unwrap();
+        assert!(t.file_names.is_empty());
+
+        let target = dir.path().join("module");
+        fs::create_dir(&target).unwrap();
+        assert!(!t.matches(&target));
+    }
+
+    #[test]
+    fn test_template_matches_nonexistent_target() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Cargo.toml"), "").unwrap();
+        let t = Template::new("rust".into(), tpl_dir).unwrap();
+        assert!(!t.matches(Path::new("/nonexistent_path")));
+    }
+
+    #[test]
+    fn test_template_display_with_files() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        let t = Template::new("docker".into(), tpl_dir).unwrap();
+        let display = t.to_string();
+        assert!(display.contains("docker"));
+        assert!(display.contains("Dockerfile"));
+    }
+
+    #[test]
+    fn test_template_display_empty() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        let t = Template::new("empty".into(), tpl_dir).unwrap();
+        let display = t.to_string();
+        assert!(display.contains("no files"));
+    }
+}

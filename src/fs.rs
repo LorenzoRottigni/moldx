@@ -1,7 +1,11 @@
-use std::{collections::BTreeSet, path::{Path}};
-use anyhow::{Result, bail};
 use crate::{errors::MoldXError, types::Entity};
-
+use anyhow::{bail, Result};
+use std::fs;
+use std::{
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+};
+use walkdir::WalkDir;
 
 pub fn sorted_read_dir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
     let mut entries = std::fs::read_dir(path)?.collect::<std::result::Result<Vec<_>, _>>()?;
@@ -46,9 +50,197 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
 
 pub fn validate_name(name: String, entity: Entity) -> Result<()> {
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
-        bail!(
-            MoldXError::InvalidName { name, entity }
-        );
+        bail!(MoldXError::InvalidName { name, entity });
     }
     Ok(())
+}
+
+pub fn discover_path<F>(
+    start: impl Into<PathBuf>,
+    predicate: F,
+    max_depth: usize,
+    traverse_upward: bool,
+) -> Result<PathBuf, MoldXError>
+where
+    F: Fn(&Path) -> bool,
+{
+    let start = start.into();
+
+    if traverse_upward {
+        let mut current = start.clone();
+
+        for _ in 0..=max_depth {
+            if predicate(&current) {
+                return Ok(current);
+            }
+
+            if let Ok(entries) = fs::read_dir(&current) {
+                if let Some(entry) = entries.flatten().find(|e| predicate(&e.path())) {
+                    return Ok(entry.path());
+                }
+            }
+
+            if !current.pop() {
+                break;
+            }
+        }
+    }
+
+    for entry in WalkDir::new(&start)
+        .max_depth(max_depth)
+        .into_iter()
+        .flatten()
+    {
+        if predicate(entry.path()) {
+            return Ok(entry.into_path());
+        }
+    }
+
+    Err(MoldXError::PathNotFound { path: start })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ffi::OsStr;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_sorted_read_dir() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("c.txt"), "").unwrap();
+        fs::write(dir.path().join("a.txt"), "").unwrap();
+        fs::write(dir.path().join("b.txt"), "").unwrap();
+        let entries = sorted_read_dir(dir.path()).unwrap();
+        let names: Vec<String> = entries
+            .iter()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, vec!["a.txt", "b.txt", "c.txt"]);
+    }
+
+    #[test]
+    fn test_sorted_read_dir_empty() {
+        let dir = tempdir().unwrap();
+        let entries = sorted_read_dir(dir.path()).unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_sorted_read_dir_nonexistent() {
+        let result = sorted_read_dir(Path::new("/nonexistent_path_12345"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_ignored_name() {
+        assert!(is_ignored_name(".git"));
+        assert!(is_ignored_name(".hidden"));
+        assert!(is_ignored_name("target"));
+        assert!(is_ignored_name("node_modules"));
+        assert!(!is_ignored_name("src"));
+        assert!(!is_ignored_name("lib"));
+    }
+
+    #[test]
+    fn test_is_shell_script() {
+        assert!(is_shell_script(Path::new("script.sh")));
+        assert!(is_shell_script(Path::new("/path/to/run.sh")));
+        assert!(!is_shell_script(Path::new("script.py")));
+        assert!(!is_shell_script(Path::new("Makefile")));
+        assert!(!is_shell_script(Path::new("noext")));
+    }
+
+    #[test]
+    fn test_file_names_for_dir_with_files() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("a.rs"), "").unwrap();
+        fs::write(dir.path().join("b.rs"), "").unwrap();
+        fs::write(dir.path().join(".hidden"), "").unwrap();
+        fs::create_dir(dir.path().join("subdir")).unwrap();
+        let names = file_names_for_dir(dir.path()).unwrap();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains("a.rs"));
+        assert!(names.contains("b.rs"));
+        assert!(!names.contains(".hidden"));
+        assert!(!names.contains("subdir"));
+    }
+
+    #[test]
+    fn test_file_names_for_file() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("standalone.txt");
+        fs::write(&file, "").unwrap();
+        let names = file_names_for_dir(&file).unwrap();
+        assert_eq!(names.len(), 1);
+        assert!(names.contains("standalone.txt"));
+    }
+
+    #[test]
+    fn test_file_names_for_empty_dir() {
+        let dir = tempdir().unwrap();
+        let names = file_names_for_dir(dir.path()).unwrap();
+        assert!(names.is_empty());
+    }
+
+    #[test]
+    fn test_validate_name_valid() {
+        assert!(validate_name("my-strategy".into(), Entity::Strategy).is_ok());
+        assert!(validate_name("build".into(), Entity::Command).is_ok());
+    }
+
+    #[test]
+    fn test_validate_name_invalid_slash() {
+        assert!(validate_name("bad/name".into(), Entity::Strategy).is_err());
+    }
+
+    #[test]
+    fn test_validate_name_invalid_backslash() {
+        assert!(validate_name("bad\\name".into(), Entity::Module).is_err());
+    }
+
+    #[test]
+    fn test_validate_name_invalid_dot() {
+        assert!(validate_name(".".into(), Entity::Template).is_err());
+    }
+
+    #[test]
+    fn test_validate_name_invalid_dotdot() {
+        assert!(validate_name("..".into(), Entity::Command).is_err());
+    }
+
+    #[test]
+    fn test_discover_path_downward_finds_file() {
+        let root = tempdir().unwrap();
+        let sub = root.path().join("a").join("b").join("c");
+        fs::create_dir_all(&sub).unwrap();
+        let target = sub.join("target.txt");
+        fs::write(&target, "").unwrap();
+        let found = discover_path(root.path(), |p| p.file_name() == Some(OsStr::new("target.txt")), 10, false);
+        assert!(found.is_ok());
+        assert_eq!(found.unwrap(), target);
+    }
+
+    #[test]
+    fn test_discover_path_not_found() {
+        let root = tempdir().unwrap();
+        let result = discover_path(root.path(), |p| p.file_name() == Some(OsStr::new("nope.txt")), 2, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_discover_path_upward_finds_dir() {
+        let root = tempdir().unwrap();
+        let sub = root.path().join("level1").join("level2");
+        fs::create_dir_all(&sub).unwrap();
+        fs::create_dir(root.path().join(".moldx")).unwrap();
+        let found = discover_path(
+            &sub,
+            |p| p.file_name() == Some(OsStr::new(".moldx")),
+            10,
+            true,
+        );
+        assert!(found.is_ok());
+    }
 }

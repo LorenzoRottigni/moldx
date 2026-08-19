@@ -46,3 +46,38 @@ impl fmt::Display for Entity {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_as_str() {
+        assert_eq!(Entity::Strategy.as_str(), "strategy");
+        assert_eq!(Entity::Template.as_str(), "template");
+        assert_eq!(Entity::Module.as_str(), "module");
+        assert_eq!(Entity::Command.as_str(), "command");
+    }
+
+    #[test]
+    fn test_from_str_valid() {
+        assert!(matches!("strategy".parse::<Entity>().unwrap(), Entity::Strategy));
+        assert!(matches!("template".parse::<Entity>().unwrap(), Entity::Template));
+        assert!(matches!("module".parse::<Entity>().unwrap(), Entity::Module));
+        assert!(matches!("command".parse::<Entity>().unwrap(), Entity::Command));
+    }
+
+    #[test]
+    fn test_from_str_invalid() {
+        let result = "unknown".parse::<Entity>();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(Entity::Strategy.to_string(), "strategy");
+        assert_eq!(Entity::Template.to_string(), "template");
+        assert_eq!(Entity::Module.to_string(), "module");
+        assert_eq!(Entity::Command.to_string(), "command");
+    }
+}

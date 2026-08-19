@@ -86,3 +86,211 @@ fn scaffold_template_dir(template_dir: &Path, target: &Path) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    fn make_client(dir: &std::path::Path) -> MoldXClient {
+        let moldx_dir = dir.join(".moldx");
+        let strategies_dir = moldx_dir.join("strategies");
+        fs::create_dir_all(&strategies_dir).unwrap();
+        let config = crate::config::MoldXConfig {
+            moldx_dir,
+            strategies_dir,
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[test]
+    fn test_new_module_no_strategy() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let module_path = dir.path().join("my-module");
+        let result = new_module(&client, vec!["module".into(), module_path.to_str().unwrap().into()]);
+        assert!(result.is_ok());
+        assert!(module_path.exists());
+    }
+
+    #[test]
+    fn test_new_module_with_strategy() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join(".moldx/strategies/docker/template");
+        fs::create_dir_all(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "FROM scratch").unwrap();
+        let client = make_client(dir.path());
+        let module_path = dir.path().join("my-docker-module");
+        let result = new_module(&client, vec!["module".into(), "docker".into(), module_path.to_str().unwrap().into()]);
+        assert!(result.is_ok());
+        assert!(module_path.join("Dockerfile").exists());
+        let content = fs::read_to_string(module_path.join("Dockerfile")).unwrap();
+        assert_eq!(content, "FROM scratch");
+    }
+
+    #[test]
+    fn test_new_module_path_already_exists() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let module_path = dir.path().join("existing");
+        fs::create_dir(&module_path).unwrap();
+        let result = new_module(&client, vec!["module".into(), module_path.to_str().unwrap().into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_module_strategy_not_found() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let module_path = dir.path().join("my-module");
+        let result = new_module(&client, vec!["module".into(), "nonexistent".into(), module_path.to_str().unwrap().into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_module_wrong_arg_count() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = new_module(&client, vec!["module".into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_select_template_single() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        let strategy = crate::strategy::Strategy::new(
+            dir.path().to_path_buf(),
+            &crate::config::MoldXConfig {
+                moldx_dir: PathBuf::from("/nonexistent"),
+                strategies_dir: dir.path().to_path_buf(),
+                bin_dir_name: "bin".into(),
+                template_dir_name: "template".into(),
+                templates_dir_name: "templates".into(),
+                modules_dir: PathBuf::from("/nonexistent"),
+                max_resolution_depth: 20,
+            },
+        ).unwrap();
+        let result = select_template(&strategy, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_select_template_none_available() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        let strategy = crate::strategy::Strategy::new(
+            dir.path().to_path_buf(),
+            &crate::config::MoldXConfig {
+                moldx_dir: PathBuf::from("/nonexistent"),
+                strategies_dir: dir.path().to_path_buf(),
+                bin_dir_name: "bin".into(),
+                template_dir_name: "template".into(),
+                templates_dir_name: "templates".into(),
+                modules_dir: PathBuf::from("/nonexistent"),
+                max_resolution_depth: 20,
+            },
+        ).unwrap();
+        let result = select_template(&strategy, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_select_template_multiple_available() {
+        let dir = tempdir().unwrap();
+        let templates_dir = dir.path().join("templates");
+        let t1 = templates_dir.join("docker");
+        let t2 = templates_dir.join("rust");
+        fs::create_dir_all(&t1).unwrap();
+        fs::create_dir_all(&t2).unwrap();
+        fs::write(t1.join("Dockerfile"), "").unwrap();
+        fs::write(t2.join("Cargo.toml"), "").unwrap();
+        let strategy = crate::strategy::Strategy::new(
+            dir.path().to_path_buf(),
+            &crate::config::MoldXConfig {
+                moldx_dir: PathBuf::from("/nonexistent"),
+                strategies_dir: dir.path().to_path_buf(),
+                bin_dir_name: "bin".into(),
+                template_dir_name: "template".into(),
+                templates_dir_name: "templates".into(),
+                modules_dir: PathBuf::from("/nonexistent"),
+                max_resolution_depth: 20,
+            },
+        ).unwrap();
+        let result = select_template(&strategy, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_select_template_by_name() {
+        let dir = tempdir().unwrap();
+        let templates_dir = dir.path().join("templates");
+        let t1 = templates_dir.join("docker");
+        let t2 = templates_dir.join("rust");
+        fs::create_dir_all(&t1).unwrap();
+        fs::create_dir_all(&t2).unwrap();
+        fs::write(t1.join("Dockerfile"), "").unwrap();
+        fs::write(t2.join("Cargo.toml"), "").unwrap();
+        let strategy = crate::strategy::Strategy::new(
+            dir.path().to_path_buf(),
+            &crate::config::MoldXConfig {
+                moldx_dir: PathBuf::from("/nonexistent"),
+                strategies_dir: dir.path().to_path_buf(),
+                bin_dir_name: "bin".into(),
+                template_dir_name: "template".into(),
+                templates_dir_name: "templates".into(),
+                modules_dir: PathBuf::from("/nonexistent"),
+                max_resolution_depth: 20,
+            },
+        ).unwrap();
+        let result = select_template(&strategy, Some("docker"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name, "docker");
+    }
+
+    #[test]
+    fn test_select_template_by_name_not_found() {
+        let dir = tempdir().unwrap();
+        let tpl_dir = dir.path().join("template");
+        fs::create_dir(&tpl_dir).unwrap();
+        fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
+        let strategy = crate::strategy::Strategy::new(
+            dir.path().to_path_buf(),
+            &crate::config::MoldXConfig {
+                moldx_dir: PathBuf::from("/nonexistent"),
+                strategies_dir: dir.path().to_path_buf(),
+                bin_dir_name: "bin".into(),
+                template_dir_name: "template".into(),
+                templates_dir_name: "templates".into(),
+                modules_dir: PathBuf::from("/nonexistent"),
+                max_resolution_depth: 20,
+            },
+        ).unwrap();
+        let result = select_template(&strategy, Some("nonexistent"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scaffold_template_dir() {
+        let dir = tempdir().unwrap();
+        let tpl = dir.path().join("template");
+        fs::create_dir_all(tpl.join("subdir")).unwrap();
+        fs::write(tpl.join("Dockerfile"), "FROM scratch").unwrap();
+        fs::write(tpl.join("subdir").join("config.yml"), "key: value").unwrap();
+        let target = dir.path().join("module");
+        fs::create_dir(&target).unwrap();
+        scaffold_template_dir(&tpl, &target).unwrap();
+        assert!(target.join("Dockerfile").exists());
+        assert!(target.join("subdir").join("config.yml").exists());
+        assert_eq!(fs::read_to_string(target.join("Dockerfile")).unwrap(), "FROM scratch");
+    }
+}

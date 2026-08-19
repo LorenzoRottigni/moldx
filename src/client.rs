@@ -166,3 +166,221 @@ impl Display for MoldXClient {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn setup_client(dir: &std::path::Path) -> MoldXClient {
+        let moldx_dir = dir.join(".moldx");
+        let strategies_dir = moldx_dir.join("strategies");
+        fs::create_dir_all(&strategies_dir).unwrap();
+
+        let config = MoldXConfig {
+            moldx_dir: moldx_dir.clone(),
+            strategies_dir: strategies_dir.clone(),
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[test]
+    fn test_client_new_empty() {
+        let dir = tempdir().unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.strategies.is_empty());
+        assert!(client.modules.is_empty());
+    }
+
+    #[test]
+    fn test_client_new_with_strategy() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("bin")).unwrap();
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        fs::write(strategy_dir.join("bin").join("build.sh"), "#!/bin/bash").unwrap();
+        let client = setup_client(dir.path());
+        assert_eq!(client.strategies.len(), 1);
+        assert_eq!(client.strategies[0].name, "docker");
+    }
+
+    #[test]
+    fn test_resolve_strategies_invalid_dir() {
+        let config = MoldXConfig {
+            moldx_dir: PathBuf::from("/nonexistent"),
+            strategies_dir: PathBuf::from("/nonexistent/strategies"),
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: PathBuf::from("/nonexistent"),
+            max_resolution_depth: 20,
+        };
+        let result = MoldXClient::resolve_strategies(&config);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_modules_with_matching_module() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        fs::create_dir_all(dir.path().join("my-service")).unwrap();
+        fs::write(dir.path().join("my-service").join("Dockerfile"), "").unwrap();
+        let client = setup_client(dir.path());
+        assert_eq!(client.modules.len(), 1);
+        assert_eq!(client.modules[0].name, "my-service");
+    }
+
+    #[test]
+    fn test_resolve_modules_skips_non_matching() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        fs::create_dir_all(dir.path().join("no-docker")).unwrap();
+        fs::write(dir.path().join("no-docker").join("main.rs"), "").unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.modules.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_modules_skips_ignored_dirs() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("node");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("package.json"), "").unwrap();
+        fs::create_dir_all(dir.path().join("target")).unwrap();
+        fs::write(dir.path().join("target").join("main.rs"), "").unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.modules.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_modules_skips_moldx_dir() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("node");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("package.json"), "").unwrap();
+        fs::create_dir_all(dir.path().join(".moldx").join("some-module")).unwrap();
+        fs::write(dir.path().join(".moldx").join("some-module").join("package.json"), "").unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.modules.is_empty());
+    }
+
+    #[test]
+    fn test_strategies_for_module() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        fs::create_dir_all(dir.path().join("my-service")).unwrap();
+        fs::write(dir.path().join("my-service").join("Dockerfile"), "").unwrap();
+        let client = setup_client(dir.path());
+        let strategies = client.strategies_for_module(&dir.path().join("my-service"));
+        assert_eq!(strategies.len(), 1);
+        assert_eq!(strategies[0].name, "docker");
+    }
+
+    #[test]
+    fn test_strategies_for_module_includes_agnostic() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let default_dir = strategies_dir.join("default");
+        fs::create_dir_all(default_dir.join("bin")).unwrap();
+        fs::write(default_dir.join("bin").join("diff.sh"), "#!/bin/bash").unwrap();
+        fs::create_dir_all(default_dir.join("template")).unwrap();
+        fs::write(default_dir.join("template").join(".gitkeep"), "").unwrap();
+        let client = setup_client(dir.path());
+        let strategies = client.strategies_for_module(&dir.path().join("anywhere"));
+        assert_eq!(strategies.len(), 1);
+        assert_eq!(strategies[0].name, "default");
+    }
+
+    #[test]
+    fn test_get_strategy_found() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        fs::create_dir_all(strategies_dir.join("default")).unwrap();
+        fs::create_dir_all(strategies_dir.join("default").join("template")).unwrap();
+        fs::write(strategies_dir.join("default").join("template").join(".gitkeep"), "").unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.get_strategy(&"default".into()).is_some());
+    }
+
+    #[test]
+    fn test_get_strategy_not_found() {
+        let dir = tempdir().unwrap();
+        let client = setup_client(dir.path());
+        assert!(client.get_strategy(&"nope".into()).is_none());
+    }
+
+    #[test]
+    fn test_get_templates() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        let client = setup_client(dir.path());
+        let templates = client.get_templates();
+        assert_eq!(templates.len(), 1);
+    }
+
+    #[test]
+    fn test_get_default_strategies() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let agnostic = strategies_dir.join("default");
+        fs::create_dir_all(agnostic.join("template")).unwrap();
+        fs::write(agnostic.join("template").join(".gitkeep"), "").unwrap();
+        let non_agnostic = strategies_dir.join("docker");
+        fs::create_dir_all(non_agnostic.join("template")).unwrap();
+        fs::write(non_agnostic.join("template").join("Dockerfile"), "").unwrap();
+        let client = setup_client(dir.path());
+        let defaults = client.get_default_strategies();
+        assert_eq!(defaults.len(), 1);
+        assert_eq!(defaults[0].name, "default");
+    }
+
+    #[test]
+    fn test_client_display() {
+        let dir = tempdir().unwrap();
+        let client = setup_client(dir.path());
+        let display = client.to_string();
+        assert!(display.contains("MoldX Snapshot"));
+        assert!(display.contains("config"));
+        assert!(display.contains("strategies"));
+        assert!(display.contains("modules"));
+        assert!(display.contains("executor"));
+    }
+
+    #[test]
+    fn test_client_display_with_strategies_and_modules() {
+        let dir = tempdir().unwrap();
+        let strategies_dir = dir.path().join(".moldx").join("strategies");
+        let strategy_dir = strategies_dir.join("docker");
+        fs::create_dir_all(strategy_dir.join("template")).unwrap();
+        fs::write(strategy_dir.join("template").join("Dockerfile"), "").unwrap();
+        fs::create_dir(dir.path().join("my-service")).unwrap();
+        fs::write(dir.path().join("my-service").join("Dockerfile"), "").unwrap();
+        let client = setup_client(dir.path());
+        let display = client.to_string();
+        assert!(display.contains("docker"));
+        assert!(display.contains("my-service"));
+    }
+}

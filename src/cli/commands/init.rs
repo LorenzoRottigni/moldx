@@ -45,3 +45,69 @@ pub async fn init(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn make_client(dir: &std::path::Path) -> MoldXClient {
+        let moldx_dir = dir.join(".moldx");
+        let strategies_dir = moldx_dir.join("strategies");
+        fs::create_dir_all(&strategies_dir).unwrap();
+        let config = crate::config::MoldXConfig {
+            moldx_dir,
+            strategies_dir,
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_init_creates_directories_and_readme() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = init(&client).await;
+        assert!(result.is_ok());
+        assert!(dir.path().join(".moldx/strategies/default/bin/.keep").exists());
+        assert!(dir.path().join(".moldx/strategies/default/bin/.keep").exists());
+        assert!(dir.path().join(".moldx/README.md").exists());
+        let readme = fs::read_to_string(dir.path().join(".moldx/README.md")).unwrap();
+        assert_eq!(readme, "# .moldx");
+    }
+
+    #[tokio::test]
+    async fn test_init_existing_strategies_dir() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        fs::create_dir_all(client.config.strategies_dir.clone()).unwrap();
+        let result = init(&client).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_init_existing_readme() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        fs::write(dir.path().join(".moldx/README.md"), "existing").unwrap();
+        let result = init(&client).await;
+        assert!(result.is_ok());
+        let readme = fs::read_to_string(dir.path().join(".moldx/README.md")).unwrap();
+        assert_eq!(readme, "existing");
+    }
+
+    #[tokio::test]
+    async fn test_init_strategies_dir_not_existing() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let strategies_dir = client.config.strategies_dir.clone();
+        fs::remove_dir_all(&strategies_dir).unwrap();
+        let result = init(&client).await;
+        assert!(result.is_ok());
+        assert!(strategies_dir.exists());
+    }
+}

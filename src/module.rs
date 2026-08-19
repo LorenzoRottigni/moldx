@@ -48,3 +48,59 @@ impl Display for Module {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    #[test]
+    fn test_module_new_valid() {
+        let dir = tempdir().unwrap();
+        let module_dir = dir.path().join("my-module");
+        fs::create_dir(&module_dir).unwrap();
+        let m = Module::new(module_dir.clone(), vec![0, 2]).unwrap();
+        assert_eq!(m.name, "my-module");
+        assert_eq!(m.dir, module_dir);
+        assert_eq!(m.strategies, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_module_new_no_filename() {
+        let result = Module::new(PathBuf::from("/"), vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_module_new_invalid_name_via_validate() {
+        let result = validate_name("..".into(), Entity::Module);
+        assert!(result.is_err());
+        let result = validate_name(".".into(), Entity::Module);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_module_display_zero_strategies() {
+        let dir = tempdir().unwrap();
+        let m = Module::new(dir.path().to_path_buf(), vec![]).unwrap();
+        let display = m.to_string();
+        assert!(display.contains("no strategies"));
+    }
+
+    #[test]
+    fn test_module_display_one_strategy() {
+        let dir = tempdir().unwrap();
+        let m = Module::new(dir.path().to_path_buf(), vec![0]).unwrap();
+        let display = m.to_string();
+        assert!(display.contains("1 strategy"));
+    }
+
+    #[test]
+    fn test_module_display_multiple_strategies() {
+        let dir = tempdir().unwrap();
+        let m = Module::new(dir.path().to_path_buf(), vec![0, 1, 2]).unwrap();
+        let display = m.to_string();
+        assert!(display.contains("3 strategies"));
+    }
+}

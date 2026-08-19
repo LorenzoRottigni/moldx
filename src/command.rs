@@ -51,3 +51,56 @@ impl Display for Command {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    #[test]
+    fn test_command_new_valid() {
+        let dir = tempdir().unwrap();
+        let script = dir.path().join("build.sh");
+        fs::write(&script, "#!/bin/bash\necho hi").unwrap();
+        let cmd = Command::new(script.clone()).unwrap();
+        assert_eq!(cmd.name, "build");
+        assert_eq!(cmd.format, "sh");
+        assert_eq!(cmd.dir, script);
+    }
+
+    #[test]
+    fn test_command_new_not_a_file() {
+        let dir = tempdir().unwrap();
+        let result = Command::new(dir.path().to_path_buf());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_new_not_shell_script() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("build.py");
+        fs::write(&file, "#!/usr/bin/env python3").unwrap();
+        let result = Command::new(file);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_new_invalid_name_via_validate() {
+        let result = validate_name("..".into(), Entity::Command);
+        assert!(result.is_err());
+        let result = validate_name(".".into(), Entity::Command);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_command_display() {
+        let dir = tempdir().unwrap();
+        let script = dir.path().join("test.sh");
+        fs::write(&script, "").unwrap();
+        let cmd = Command::new(script).unwrap();
+        let display = cmd.to_string();
+        assert!(display.contains("test"));
+        assert!(display.contains("sh"));
+    }
+}

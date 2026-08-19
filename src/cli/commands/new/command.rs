@@ -35,3 +35,89 @@ pub fn new_command(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     println!("Created command {} at {}", command_name, script_path.display());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    fn make_client(dir: &std::path::Path) -> MoldXClient {
+        let moldx_dir = dir.join(".moldx");
+        let strategies_dir = moldx_dir.join("strategies");
+        fs::create_dir_all(&strategies_dir).unwrap();
+        let config = crate::config::MoldXConfig {
+            moldx_dir,
+            strategies_dir,
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[test]
+    fn test_new_command_default_strategy() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".moldx/strategies/default/bin")).unwrap();
+        let client = make_client(dir.path());
+        let result = new_command(&client, vec!["command".into(), "build".into()]);
+        assert!(result.is_ok());
+        let script = dir.path().join(".moldx/strategies/default/bin/build.sh");
+        assert!(script.exists());
+        let content = fs::read_to_string(&script).unwrap();
+        assert!(content.contains("build"));
+    }
+
+    #[test]
+    fn test_new_command_explicit_strategy() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".moldx/strategies/docker/bin")).unwrap();
+        let client = make_client(dir.path());
+        let result = new_command(&client, vec!["command".into(), "docker".into(), "deploy".into()]);
+        assert!(result.is_ok());
+        assert!(dir.path().join(".moldx/strategies/docker/bin/deploy.sh").exists());
+    }
+
+    #[test]
+    fn test_new_command_strategy_not_found() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = new_command(&client, vec!["command".into(), "nonexistent".into(), "build".into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_command_already_exists() {
+        let dir = tempdir().unwrap();
+        let bin_dir = dir.path().join(".moldx/strategies/default/bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        fs::write(bin_dir.join("build.sh"), "").unwrap();
+        let client = make_client(dir.path());
+        let result = new_command(&client, vec!["command".into(), "build".into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_command_wrong_arg_count() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = new_command(&client, vec!["command".into()]);
+        assert!(result.is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_new_command_executable_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".moldx/strategies/default/bin")).unwrap();
+        let client = make_client(dir.path());
+        new_command(&client, vec!["command".into(), "test".into()]).unwrap();
+        let script = dir.path().join(".moldx/strategies/default/bin/test.sh");
+        let perms = fs::metadata(&script).unwrap().permissions();
+        assert_eq!(perms.mode() & 0o777, 0o755);
+    }
+}

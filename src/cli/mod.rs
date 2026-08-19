@@ -1,9 +1,15 @@
-use clap::{Subcommand};
-use std::path::PathBuf;
-use clap::Parser;
 use anyhow::Result;
+use clap::Parser;
+use clap::Subcommand;
+use std::path::PathBuf;
 
 use crate::client::MoldXClient;
+use crate::constants::DEFAULT_BIN_DIR_NAME;
+use crate::constants::DEFAULT_MAX_RESOLUTION_DEPTH;
+use crate::constants::DEFAULT_STRATEGIES_DIR_NAME;
+use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
+use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
+use crate::constants::MOLDX_DIR_NAME;
 
 pub mod commands;
 
@@ -16,7 +22,7 @@ pub struct Cli {
         long = "moldx-dir",
         env = "MOLDX_DIR",
         global = true,
-        default_value = ".moldx"
+        default_value = MOLDX_DIR_NAME
     )]
     pub moldx_dir: String,
 
@@ -24,7 +30,7 @@ pub struct Cli {
         long = "strategies-dir-name",
         env = "MOLDX_STRATEGIES_DIR_NAME",
         global = true,
-        default_value = "strategies"
+        default_value = DEFAULT_STRATEGIES_DIR_NAME
     )]
     pub strategies_dir_name: String,
 
@@ -32,7 +38,7 @@ pub struct Cli {
         long = "bin-dir-name",
         env = "MOLDX_BIN_DIR_NAME",
         global = true,
-        default_value = "bin"
+        default_value = DEFAULT_BIN_DIR_NAME
     )]
     pub bin_dir_name: String,
 
@@ -40,7 +46,7 @@ pub struct Cli {
         long = "templates-dir-name",
         env = "MOLDX_TEMPLATES_DIR_NAME",
         global = true,
-        default_value = "templates"
+        default_value = DEFAULT_TEMPLATES_DIR_NAME
     )]
     pub templates_dir_name: String,
 
@@ -48,17 +54,20 @@ pub struct Cli {
         long = "template-dir-name",
         env = "MOLDX_TEMPLATE_DIR_NAME",
         global = true,
-        default_value = "template"
+        default_value = DEFAULT_TEMPLATE_DIR_NAME
     )]
     pub template_dir_name: String,
 
+    #[arg(long = "modules-dir", env = "MOLDX_MODULES_DIR", global = true)]
+    pub modules_dir: Option<String>,
+
     #[arg(
-        long = "modules-dir",
-        env = "MOLDX_MODULES_DIR",
+        long = "max-resolution-depth",
+        env = "MOLDX_MAX_RESOLUTION_DEPTH",
         global = true,
-        default_value = "./playground"
+        default_value_t = DEFAULT_MAX_RESOLUTION_DEPTH
     )]
-    pub modules_dir: String,
+    pub max_resolution_depth: usize,
 }
 
 impl Cli {

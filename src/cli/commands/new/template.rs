@@ -24,3 +24,62 @@ pub fn new_template(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+
+    fn make_client(dir: &std::path::Path) -> MoldXClient {
+        let moldx_dir = dir.join(".moldx");
+        let strategies_dir = moldx_dir.join("strategies");
+        fs::create_dir_all(&strategies_dir).unwrap();
+        let config = crate::config::MoldXConfig {
+            moldx_dir,
+            strategies_dir,
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[test]
+    fn test_new_template_default_strategy() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".moldx/strategies/default")).unwrap();
+        let client = make_client(dir.path());
+        let result = new_template(&client, vec!["template".into(), "mytpl".into()]);
+        assert!(result.is_ok());
+        assert!(dir.path().join(".moldx/strategies/default/templates/mytpl/.keep").exists());
+    }
+
+    #[test]
+    fn test_new_template_explicit_strategy() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".moldx/strategies/docker")).unwrap();
+        let client = make_client(dir.path());
+        let result = new_template(&client, vec!["template".into(), "docker".into(), "mytpl".into()]);
+        assert!(result.is_ok());
+        assert!(dir.path().join(".moldx/strategies/docker/templates/mytpl/.keep").exists());
+    }
+
+    #[test]
+    fn test_new_template_strategy_not_found() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = new_template(&client, vec!["template".into(), "nonexistent".into(), "mytpl".into()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_template_wrong_arg_count() {
+        let dir = tempdir().unwrap();
+        let client = make_client(dir.path());
+        let result = new_template(&client, vec!["template".into()]);
+        assert!(result.is_err());
+    }
+}

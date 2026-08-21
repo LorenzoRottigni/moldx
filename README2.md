@@ -115,9 +115,19 @@ moldx build packages/docker-module
 
 ### Moldx ui
 
-## Architecture
+## Guidelines
 
-What is expected where and what is allowed.
+### .moldx dir
+
+Moldx requires a .moldx dir to be configured and work properly.
+Moldx has been designed to work within a git repository and .moldx should be pushed to remote.
+.moldx dir path can be passed explicitly to the MoldX cli via arg or env providing the flexibility to run outside a git environment.
+As standard convention MoldX expects to find .moldx dir in the root of the repo otherwise the git workspace will be scanned within a max_depth_resolution depth range.
+If MoldX is able to resolve the .moldx dir then moldx commands can be invoked from anywhere within the git workspace.
+
+### Modules resolution
+
+Moldx tries to resolve modules from the parent path of the .moldx dir to a max_depth_resolution depth range.
 
 ## Configuration
 
@@ -138,7 +148,35 @@ MoldX provides a TUI able to wrap all the moldx CLI capabilities.
 
 ## Roadmap
 
-Coming next
+### Executors
+
+- executors/ contains execution targets besides shell default execution
+- executors/python.sh provides an sh script for executing a python command (wraps python)
+- Probably we need a contract for commands params in order to allow both an sh script and a python scripts to receive them as args (does shell params can be propagated to any target? Probably, cause executor is still an sh)
+
+### Missing args stdin
+
+e.g. running `moldx build ./multi-strategy-target` where target has strategies `docker` and  `node` both providing `build` command will prompt to pick a strategy to run with
+
+### Deamon
+
+Allow Moldx background execution: running “Moldx” simply starts a deamon, all Moldx commands are forwarded to the deamon which handles them. Deamon instantiate Moldx client at startup and the reuse it. If a demon is running both cli commands and tui connect to it. If daemon is not running cli commands run without it and tui starts one.
+
+### Vscode Plugin for MoldX deamon
+
+vscode plugin to view and interact with daemon.
+
+### Improved init
+
+- scan available modules and auto scaffold common strategies e.g. if we detect a module with a package.json we scaffold a default node strategy with a default suite of node commands (test, dev, build, start, ...) and templates (node, ts-node, ...)
+
+### Git submodules
+
+Use git sub modules to ship Moldx outside monorepos
+
+### Dev Container
+
+Some kind of cool integration with dev container
 
 ## Contributing
 

@@ -6,6 +6,24 @@ mod template;
 use crate::{client::MoldXClient, types::Entity, errors::MoldXError};
 use anyhow::Result;
 
+/// Scaffolds a new MoldX entity.
+///
+/// Dispatches to the entity-specific scaffold handler based on the first
+/// argument, which must parse as an [`Entity`].
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw arguments; the first selects the entity kind.
+///
+/// # Returns
+///
+/// Ok once the entity has been scaffolded.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::NewUsage`] when no arguments are given, and any
+/// error raised while parsing the entity or scaffolding it.
 pub async fn new(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if args.is_empty() {
         return Err(MoldXError::NewUsage.into());

@@ -13,6 +13,12 @@ use crate::errors::MoldXError;
 
 type PID = u32;
 
+/// Status of a tracked process.
+///
+/// - [`Running`](ProcessStatus::Running) means the process is still executing.
+/// - [`Completed`](ProcessStatus::Completed) carries the exit code.
+/// - [`Failed`](ProcessStatus::Failed) carries a failure description.
+/// - [`Killed`](ProcessStatus::Killed) means the process was terminated.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProcessStatus {
     Running,
@@ -22,6 +28,11 @@ pub enum ProcessStatus {
 }
 
 impl ProcessStatus {
+    /// Returns a plain-text label for the status.
+    ///
+    /// # Returns
+    ///
+    /// A human-readable description such as `"Running"` or `"Done(0)"`.
     pub fn label(&self) -> String {
         match self {
             ProcessStatus::Running => "Running".to_string(),
@@ -31,6 +42,11 @@ impl ProcessStatus {
         }
     }
 
+    /// Returns whether the process is still running.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the status is [`ProcessStatus::Running`].
     pub fn is_running(&self) -> bool {
         matches!(self, ProcessStatus::Running)
     }
@@ -47,6 +63,10 @@ impl Display for ProcessStatus {
     }
 }
 
+/// A tracked process with its accumulated output.
+///
+/// `RunningProcess` stores the metadata needed to identify and manage a
+/// spawned script together with a bounded buffer of its output lines.
 #[derive(Debug, Clone)]
 pub struct RunningProcess {
     pub id: u64,
@@ -59,6 +79,10 @@ pub struct RunningProcess {
     pub output_lines: VecDeque<String>,
 }
 
+/// An immutable snapshot of a tracked process.
+///
+/// Unlike [`RunningProcess`], a summary omits the buffered output lines,
+/// making it cheap to query for display purposes.
 #[derive(Debug, Clone)]
 pub struct ProcessSummary {
     pub id: u64,
@@ -76,6 +100,11 @@ struct state {
     next_id: u64,
 }
 
+/// Handles command execution and process tracking.
+///
+/// `Executor` spawns strategy scripts both in the background and in
+/// blocking mode, and keeps shared state for tracked processes so their
+/// status and output can be inspected from other tasks.
 #[derive(Debug)]
 pub struct Executor {
     processes: HashMap<PID, Child>,
@@ -92,6 +121,11 @@ impl Clone for Executor {
 }
 
 impl Executor {
+    /// Creates a new executor with no tracked processes.
+    ///
+    /// # Returns
+    ///
+    /// An empty [`Executor`].
     pub fn new() -> Self {
         Self {
             processes: HashMap::new(),
@@ -102,6 +136,25 @@ impl Executor {
         }
     }
 
+    /// Spawns a script in the background and registers it by PID.
+    ///
+    /// The script is executed with `bash` and receives the module path as
+    /// its first argument. The spawned child is not tracked in the shared
+    /// process state; use [`run_and_track`] for tracked runs.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - Path to the shell script to execute.
+    /// * `module_path` - Path passed to the script as its first argument.
+    ///
+    /// # Returns
+    ///
+    /// The PID of the spawned process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::ProcessSpawnFailed`] if the process cannot be
+    /// spawned or its PID cannot be determined.
     pub async fn exec(
         &mut self,
         script: &Path,
@@ -118,6 +171,23 @@ impl Executor {
         Ok(pid)
     }
 
+    /// Runs a script to completion and returns its exit code.
+    ///
+    /// The script is executed with `bash` and receives the module path as
+    /// its first argument.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - Path to the shell script to execute.
+    /// * `module_path` - Path passed to the script as its first argument.
+    ///
+    /// # Returns
+    ///
+    /// The exit code of the script, or `1` if the code cannot be determined.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process cannot be spawned or waited on.
     pub async fn exec_blocking(
         &self,
         script: &Path,
@@ -133,6 +203,19 @@ impl Executor {
     }
 
     // State management methods
+
+    /// Registers a new tracked process and assigns it a unique ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `module_path` - Path of the module the process runs against.
+    /// * `strategy` - Name of the strategy being executed.
+    /// * `command` - Name of the command being executed.
+    /// * `pid` - Operating system PID, if already known.
+    ///
+    /// # Returns
+    ///
+    /// The unique identifier assigned to the tracked process.
     pub fn add_process(&self, module_path: &str, strategy: &str, command: &str, pid: Option<u32>) -> u64 {
         let mut g = self.state.lock().unwrap();
         let id = g.next_id;
@@ -150,6 +233,14 @@ impl Executor {
         id
     }
 
+    /// Updates the operating system PID of a tracked process.
+    ///
+    /// Does nothing if no process with the given ID exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the tracked process.
+    /// * `pid` - The new PID, or `None` to clear it.
     pub fn update_pid(&self, id: u64, pid: Option<u32>) {
         let mut g = self.state.lock().unwrap();
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
@@ -157,6 +248,14 @@ impl Executor {
         }
     }
 
+    /// Updates the status of a tracked process.
+    ///
+    /// Does nothing if no process with the given ID exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the tracked process.
+    /// * `status` - The new [`ProcessStatus`].
     pub fn update_status(&self, id: u64, status: ProcessStatus) {
         let mut g = self.state.lock().unwrap();
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
@@ -164,6 +263,15 @@ impl Executor {
         }
     }
 
+    /// Appends an output line to a tracked process.
+    ///
+    /// The buffer is capped at 500 lines; older lines are dropped. Does
+    /// nothing if no process with the given ID exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the tracked process.
+    /// * `line` - The output line to append.
     pub fn append_output(&self, id: u64, line: String) {
         let mut g = self.state.lock().unwrap();
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
@@ -174,6 +282,11 @@ impl Executor {
         }
     }
 
+    /// Returns snapshots of all tracked processes.
+    ///
+    /// # Returns
+    ///
+    /// A [`ProcessSummary`] for every tracked process, in registration order.
     pub fn get_summaries(&self) -> Vec<ProcessSummary> {
         let g = self.state.lock().unwrap();
         g.processes
@@ -190,6 +303,15 @@ impl Executor {
             .collect()
     }
 
+    /// Returns the buffered output lines of a tracked process.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the tracked process.
+    ///
+    /// # Returns
+    ///
+    /// The process output lines, or an empty queue if the process is unknown.
     pub fn get_output(&self, id: u64) -> VecDeque<String> {
         let g = self.state.lock().unwrap();
         g.processes
@@ -199,6 +321,14 @@ impl Executor {
             .unwrap_or_default()
     }
 
+    /// Terminates a tracked process and marks it as killed.
+    ///
+    /// On Unix, the whole process group receives `SIGTERM`. Processes
+    /// without a known PID are still marked as killed.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the tracked process.
     pub fn kill_process(&self, id: u64) {
         let pid = {
             let g = self.state.lock().unwrap();
@@ -223,6 +353,7 @@ impl Executor {
         self.update_status(id, ProcessStatus::Killed);
     }
 
+    /// Kills all tracked processes that are still running.
     pub fn kill_all_running(&self) {
         let running_ids: Vec<u64> = {
             let g = self.state.lock().unwrap();
@@ -541,8 +672,20 @@ mod tests {
     }
 }
 
-/// Spawn `script` in the background, stream its output into executor, and
-/// update the process status when it exits.
+/// Spawns `script` in the background, streams its output into the executor,
+/// and updates the process status when it exits.
+///
+/// Standard output lines are appended verbatim; standard error lines are
+/// prefixed with `[err]`. On Unix the child runs in its own process group so
+/// it can be killed as a whole.
+///
+/// # Arguments
+///
+/// * `executor` - Shared executor holding the tracked process state.
+/// * `id` - Identifier of the tracked process, as returned by
+///   [`Executor::add_process`].
+/// * `script` - Path to the shell script to execute.
+/// * `module_path` - Path passed to the script as its first argument.
 pub async fn run_and_track(
     executor: Arc<Executor>,
     id: u64,

@@ -3,6 +3,11 @@ use thiserror::Error;
 
 use crate::types::Entity;
 
+/// Errors produced by MoldX operations.
+///
+/// Every variant renders a human-readable message through its
+/// [`std::error::Error`] implementation, covering configuration, resolution,
+/// scaffolding, and process execution failures.
 #[derive(Error, Debug)]
 pub enum MoldXError {
     #[error("unable to determine current directory")]

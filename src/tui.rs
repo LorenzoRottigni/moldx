@@ -52,6 +52,10 @@ use crate::{
     module::Module,
 };
 
+/// Session holding the terminal and the shared executor.
+///
+/// Ensures that running processes are killed and the terminal is restored
+/// when the session is dropped.
 struct TuiSession {
     terminal: Option<Terminal<CrosstermBackend<io::Stdout>>>,
     executor: Arc<Executor>,
@@ -83,6 +87,7 @@ impl Drop for TuiSession {
     }
 }
 
+/// The focusable panels of the UI.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Panel {
     Modules,
@@ -107,6 +112,10 @@ impl Panel {
     }
 }
 
+/// State of the interactive UI.
+///
+/// Tracks the focused panel, the cursor position of each list, the commands
+/// available for the selected module, and the asynchronous module refresh.
 struct TuiApp {
     client: Arc<MoldXClient>,
     modules: Vec<Module>,
@@ -121,6 +130,7 @@ struct TuiApp {
     log: Vec<String>,
 }
 
+/// A command entry shown in the Commands panel.
 #[derive(Debug, Clone)]
 struct CommandItem {
     strategy: String,
@@ -709,6 +719,24 @@ fn draw_help(frame: &mut Frame, area: Rect) {
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
+/// Runs the interactive terminal UI.
+///
+/// Installs a panic hook that restores the terminal, switches to the
+/// alternate screen, and enters the event loop drawing the three panels.
+/// The UI runs until the user quits or a shutdown signal is received.
+///
+/// # Arguments
+///
+/// * `client` - The client whose strategies and modules populate the UI.
+///
+/// # Returns
+///
+/// Ok when the UI exits normally.
+///
+/// # Errors
+///
+/// Returns an error if the terminal cannot be set up, a frame cannot be
+/// drawn, or the terminal is unavailable during the run.
 pub async fn run(client: &MoldXClient) -> Result<()> {
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

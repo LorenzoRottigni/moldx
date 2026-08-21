@@ -9,6 +9,10 @@ use crate::errors::MoldXError;
 use crate::fs::{file_names_for_dir, validate_name};
 use crate::types::Entity;
 
+/// Defines the files used to identify modules and strategies.
+///
+/// A `Template` is a directory of marker files. A directory matches a
+/// template when it contains at least all of the template's file names.
 #[derive(Debug, Clone)]
 pub struct Template {
     pub name: String,
@@ -17,6 +21,22 @@ pub struct Template {
 }
 
 impl Template {
+    /// Creates a new template from the given directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the template.
+    /// * `template_dir` - The directory containing the template files.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized [`Template`] with its file names collected.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::InvalidTemplateDir`] if the directory does not
+    /// exist or is not a directory, and [`MoldXError::InvalidName`] if the
+    /// name is not valid.
     pub fn new(name: String, template_dir: PathBuf) -> Result<Self> {
         if !template_dir.exists() || !template_dir.is_dir() {
             return Err(MoldXError::InvalidTemplateDir { path: template_dir }.into());
@@ -29,6 +49,17 @@ impl Template {
         })
     }
 
+    /// Returns whether the target directory contains all template files.
+    ///
+    /// Templates without file names never match.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The directory to test against the template.
+    ///
+    /// # Returns
+    ///
+    /// `true` if every template file name exists in the target directory.
     pub fn matches(&self, target: &Path) -> bool {
         if self.file_names.is_empty() {
             return false;

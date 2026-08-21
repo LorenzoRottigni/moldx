@@ -13,6 +13,10 @@ use crate::constants::MOLDX_DIR_NAME;
 
 pub mod commands;
 
+/// Command line interface for MoldX.
+///
+/// Global options configure the MoldX project layout and can also be
+/// provided through environment variables.
 #[derive(Parser)]
 pub struct Cli {
     #[command(subcommand)]
@@ -71,6 +75,21 @@ pub struct Cli {
 }
 
 impl Cli {
+    /// Dispatches the parsed subcommand with the given client.
+    ///
+    /// Defaults to launching the interactive UI when no subcommand is given.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - The initialized MoldX client.
+    ///
+    /// # Returns
+    ///
+    /// Ok when the selected subcommand completes successfully.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected subcommand fails.
     pub async fn exec_with(self, client: MoldXClient) -> Result<()> {
         match self.command.unwrap_or(Command::Ui) {
             // moldx [ui]

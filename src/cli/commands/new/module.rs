@@ -8,6 +8,27 @@ use walkdir::WalkDir;
 
 use crate::{client::MoldXClient, errors::MoldXError, template::Template};
 
+/// Scaffolds a new module directory.
+///
+/// Accepts `<module-path>`, `<strategy> <module-path>`, or
+/// `<strategy> <template> <module-path>`. When a strategy is given, the
+/// selected template is copied into the new module directory.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw arguments; see above for the accepted forms.
+///
+/// # Returns
+///
+/// Ok once the module directory has been created.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::NewModuleUsage`] on malformed arguments,
+/// [`MoldXError::ModulePathAlreadyExists`] if the path already exists,
+/// [`MoldXError::StrategyNotFound`] if the strategy is unknown, any error
+/// raised while selecting a template, and any IO error while scaffolding.
 pub fn new_module(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     let (strategy_name, template_name, module_index) = match args.len() {
         2 => (None, None, 1),
@@ -43,6 +64,27 @@ pub fn new_module(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+/// Selects the template to scaffold a module from.
+///
+/// Scaffoldable templates are those containing at least one file. With an
+/// explicit name, the matching template is returned; otherwise the strategy
+/// must expose exactly one scaffoldable template.
+///
+/// # Arguments
+///
+/// * `strategy` - The strategy to pick a template from.
+/// * `template_name` - Optional explicit template name.
+///
+/// # Returns
+///
+/// The selected template.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::TemplateNotFound`] if the named template does not
+/// exist or contains no files, [`MoldXError::NoScaffoldableTemplate`] if
+/// the strategy exposes none, and [`MoldXError::MultipleTemplates`] if it
+/// exposes several without an explicit choice.
 fn select_template(strategy: &crate::strategy::Strategy, template_name: Option<&str>) -> Result<Template> {
     let templates: Vec<Template> = strategy
         .templates
@@ -66,6 +108,23 @@ fn select_template(strategy: &crate::strategy::Strategy, template_name: Option<&
     }
 }
 
+/// Copies all files of a template directory into the target directory.
+///
+/// Subdirectories are recreated and hidden files are copied as-is.
+///
+/// # Arguments
+///
+/// * `template_dir` - The template directory to copy from.
+/// * `target` - The module directory to copy into.
+///
+/// # Returns
+///
+/// Ok once all files have been copied.
+///
+/// # Errors
+///
+/// Returns an error if directories cannot be created or files cannot be
+/// copied.
 fn scaffold_template_dir(template_dir: &Path, target: &Path) -> Result<()> {
     for entry in WalkDir::new(template_dir).follow_links(false).into_iter().filter_map(|entry| entry.ok()) {
         if !entry.file_type().is_file() {

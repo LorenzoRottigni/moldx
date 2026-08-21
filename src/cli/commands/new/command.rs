@@ -3,6 +3,27 @@ use crate::errors::MoldXError;
 use anyhow::Result;
 use std::{fs, io::Write};
 
+/// Scaffolds a new command script in a strategy's bin directory.
+///
+/// Accepts either `<command>` (defaulting to the `default` strategy) or
+/// `<strategy> <command>`. The generated script is executable and receives
+/// the module path as its first argument.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw arguments; see above for the accepted forms.
+///
+/// # Returns
+///
+/// Ok once the command script has been created.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::NewCommandUsage`] on malformed arguments,
+/// [`MoldXError::StrategyNotFound`] if the strategy does not exist,
+/// [`MoldXError::CommandAlreadyExists`] if the script already exists, and
+/// any IO error raised while writing the script.
 pub fn new_command(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     let (strategy_name, command_name) = match args.len() {
         2 => ("default".to_string(), args[1].clone()),

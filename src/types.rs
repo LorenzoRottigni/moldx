@@ -3,6 +3,13 @@ use std::fmt;
 
 use crate::errors::MoldXError;
 
+/// The kinds of entities managed by MoldX.
+///
+/// - [`Strategy`](Entity::Strategy) describes how a module can be processed.
+/// - [`Template`](Entity::Template) defines the files used to identify
+///   modules and strategies.
+/// - [`Module`](Entity::Module) represents a discovered project module.
+/// - [`Command`](Entity::Command) represents an executable strategy script.
 #[derive(Debug)]
 pub enum Entity {
     Strategy,
@@ -12,6 +19,11 @@ pub enum Entity {
 }
 
 impl Entity {
+    /// Returns the canonical lowercase name of the entity.
+    ///
+    /// # Returns
+    ///
+    /// The entity name as a static string, e.g. `"strategy"`.
     pub fn as_str(&self) -> &'static str {
         match self {
             Entity::Strategy => "strategy",
@@ -25,6 +37,20 @@ impl Entity {
 impl FromStr for Entity {
     type Err = MoldXError;
 
+    /// Parses an entity name into an [`Entity`].
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The entity name, e.g. `"strategy"`.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding [`Entity`] variant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::UnknownEntity`] if the value does not name a
+    /// known entity.
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "strategy" => Ok(Entity::Strategy),

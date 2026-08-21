@@ -3,6 +3,26 @@ use crate::errors::MoldXError;
 use anyhow::Result;
 use std::fs;
 
+/// Scaffolds a new template directory for a strategy.
+///
+/// Accepts either `<template>` (defaulting to the `default` strategy) or
+/// `<strategy> <template>`. The created template contains a `.keep`
+/// placeholder.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw arguments; see above for the accepted forms.
+///
+/// # Returns
+///
+/// Ok once the template directory has been created.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::NewTemplateUsage`] on malformed arguments,
+/// [`MoldXError::StrategyNotFound`] if the strategy does not exist, and any
+/// IO error raised while creating directories or files.
 pub fn new_template(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     let (strategy_name, template_name) = match args.len() {
         2 => ("default".to_string(), args[1].clone()),

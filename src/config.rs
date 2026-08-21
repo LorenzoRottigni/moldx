@@ -5,6 +5,16 @@ use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
+/// Configuration for a MoldX project.
+///
+/// `MoldXConfig` defines the filesystem layout used by MoldX:
+///
+/// - `moldx_dir` is the root directory of the MoldX project.
+/// - `strategies_dir` is the directory containing the available strategies.
+/// - `bin_dir_name`, `template_dir_name`, and `templates_dir_name` define
+///   the naming conventions inside a strategy directory.
+/// - `modules_dir` is the directory scanned for modules.
+/// - `max_resolution_depth` limits how deep path discovery may traverse.
 #[derive(Debug, Clone)]
 pub struct MoldXConfig {
     pub moldx_dir: PathBuf,
@@ -17,6 +27,37 @@ pub struct MoldXConfig {
 }
 
 impl MoldXConfig {
+    /// Creates a new MoldX configuration.
+    ///
+    /// If the given MoldX directory does not exist, it is discovered by
+    /// searching upward from the current working directory. If no modules
+    /// directory is provided, the parent of the MoldX directory is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `moldx_dir` - Path to the MoldX project directory.
+    /// * `strategies_dir_name` - Name of the strategies directory inside the
+    ///   MoldX directory.
+    /// * `bin_dir_name` - Name of the command scripts directory inside a
+    ///   strategy.
+    /// * `template_dir_name` - Name of the singular template directory inside
+    ///   a strategy.
+    /// * `templates_dir_name` - Name of the plural templates directory inside
+    ///   a strategy.
+    /// * `max_resolution_depth` - Maximum depth used when discovering paths.
+    /// * `modules_dir` - Optional modules directory; defaults to the parent
+    ///   of the MoldX directory.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized [`MoldXConfig`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::CurrentDir`] if the current directory cannot be
+    /// determined, [`MoldXError::PathNotFound`] if the MoldX directory cannot
+    /// be discovered, and [`MoldXError::RunUsage`] if the modules directory
+    /// has to be derived but the MoldX directory has no parent.
     pub fn new(
         moldx_dir: String,
         strategies_dir_name: String,

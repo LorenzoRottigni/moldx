@@ -1,3 +1,9 @@
+//! Entry point of the MoldX command line application.
+//!
+//! Parses the CLI arguments, builds the project configuration and client,
+//! prints a snapshot of the resolved project, and dispatches to the
+//! selected subcommand.
+
 use anyhow::Result;
 use clap::Parser;
 
@@ -15,6 +21,16 @@ pub mod template;
 pub mod tui;
 pub mod types;
 
+/// Runs the MoldX command line application.
+///
+/// Builds the configuration and client from the parsed CLI arguments,
+/// prints a snapshot of the resolved project, and dispatches to the
+/// selected subcommand.
+///
+/// # Errors
+///
+/// Returns an error if the configuration or client cannot be created, or if
+/// the selected subcommand fails.
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse();

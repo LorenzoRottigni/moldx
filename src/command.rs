@@ -7,6 +7,10 @@ use crate::fs::{is_shell_script, validate_name};
 use crate::types::Entity;
 use anyhow:: Result;
 
+/// Represents an executable strategy script.
+///
+/// A `Command` wraps a single `.sh` file inside a strategy's bin directory.
+/// The command name is derived from the file stem.
 #[derive(Debug, Clone)]
 pub struct Command {
     pub name: String,
@@ -15,6 +19,21 @@ pub struct Command {
 }
 
 impl Command {
+    /// Creates a new command from the given script path.
+    ///
+    /// # Arguments
+    ///
+    /// * `command_dir` - Path to the command script.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized [`Command`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::CommandNotFound`] if the path is not a `.sh`
+    /// file, and [`MoldXError::InvalidName`] if the file stem cannot be
+    /// determined or the derived name is not valid.
     pub fn new(command_dir: PathBuf) -> Result<Self> {
         if !command_dir.is_file() || !is_shell_script(&command_dir) {
             return Err(MoldXError::CommandNotFound { name: "".into(), path: command_dir }.into())

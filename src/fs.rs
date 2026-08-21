@@ -7,20 +7,71 @@ use std::{
 };
 use walkdir::WalkDir;
 
+/// Reads a directory and returns its entries sorted by file name.
+///
+/// # Arguments
+///
+/// * `path` - The directory to read.
+///
+/// # Returns
+///
+/// The directory entries sorted lexicographically by file name.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read or an entry cannot be
+/// accessed.
 pub fn sorted_read_dir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
     let mut entries = std::fs::read_dir(path)?.collect::<std::result::Result<Vec<_>, _>>()?;
     entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
     Ok(entries)
 }
 
+/// Returns whether a directory name should be skipped during discovery.
+///
+/// Hidden names (starting with `.`) as well as `target` and `node_modules`
+/// are considered ignored.
+///
+/// # Arguments
+///
+/// * `name` - The file name to test.
+///
+/// # Returns
+///
+/// `true` if the name should be ignored.
 pub fn is_ignored_name(name: &str) -> bool {
     name.starts_with('.') || name == "target" || name == "node_modules"
 }
 
+/// Returns whether a path refers to a shell script.
+///
+/// # Arguments
+///
+/// * `path` - The path to test.
+///
+/// # Returns
+///
+/// `true` if the path has a `.sh` extension.
 pub fn is_shell_script(path: &Path) -> bool {
     path.extension().and_then(|ext| ext.to_str()) == Some("sh")
 }
 
+/// Collects the names of the files directly contained in a directory.
+///
+/// Hidden files are skipped and subdirectories are not traversed. When the
+/// given path is a file, a set containing only its own name is returned.
+///
+/// # Arguments
+///
+/// * `root` - The directory (or file) to inspect.
+///
+/// # Returns
+///
+/// The sorted set of visible file names.
+///
+/// # Errors
+///
+/// Returns an error if the directory cannot be read.
 pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     if root.is_file() {
         let mut names = BTreeSet::new();
@@ -48,6 +99,24 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
+/// Validates the name of a MoldX entity.
+///
+/// Names must not contain path separators and must not be `.` or `..`.
+///
+/// # Arguments
+///
+/// * `name` - The name to validate.
+/// * `entity` - The entity kind the name belongs to, used for error
+///   reporting.
+///
+/// # Returns
+///
+/// `Ok(())` if the name is valid.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::InvalidName`] if the name contains a path separator
+/// or is `.` or `..`.
 pub fn validate_name(name: String, entity: Entity) -> Result<()> {
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
         bail!(MoldXError::InvalidName { name, entity });
@@ -55,6 +124,27 @@ pub fn validate_name(name: String, entity: Entity) -> Result<()> {
     Ok(())
 }
 
+/// Searches the filesystem for the first path satisfying a predicate.
+///
+/// When `traverse_upward` is set, the search starts at `start` and walks up
+/// the directory tree, checking each level and its direct children, before
+/// falling back to a downward scan rooted at `start`.
+///
+/// # Arguments
+///
+/// * `start` - The path where the search begins.
+/// * `predicate` - The match function applied to candidate paths.
+/// * `max_depth` - Maximum number of upward steps and maximum depth of the
+///   downward walk.
+/// * `traverse_upward` - Whether to search upward before scanning downward.
+///
+/// # Returns
+///
+/// The first matching path.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::PathNotFound`] if no path satisfies the predicate.
 pub fn discover_path<F>(
     start: impl Into<PathBuf>,
     predicate: F,

@@ -2,6 +2,29 @@ use crate::{client::MoldXClient, command::Command, errors::MoldXError};
 use anyhow::Result;
 
 
+/// Runs a strategy command for a module path.
+///
+/// Accepts either `<command> <path>` or `<strategy> <command> <path>`.
+/// Without a strategy hint, the first available strategy exposing the
+/// command wins. Exits with the script's exit code when it is non-zero.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw positional arguments from the external subcommand.
+///
+/// # Returns
+///
+/// Ok when the command completes with exit code zero.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::RunUsage`] or [`MoldXError::TooManyArguments`] on
+/// malformed arguments, [`MoldXError::PathNotFound`] if the path does not
+/// exist, [`MoldXError::StrategyNotAvailable`] if the hinted strategy does
+/// not apply to the path, [`MoldXError::CommandNotFoundInStrategy`] or
+/// [`MoldXError::CommandNotFound`] if the command is unknown, and any error
+/// raised while executing the script.
 pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if args.len() < 2 {
         return Err(MoldXError::RunUsage.into());

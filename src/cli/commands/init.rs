@@ -5,6 +5,23 @@ use std::path::{PathBuf};
 
 use crate::client::MoldXClient;
 
+/// Initializes a new `.moldx` directory structure.
+///
+/// Creates the strategies directory if missing, scaffolds a default strategy
+/// with empty bin and template directories, and writes a README.md unless it
+/// already exists.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client providing the configuration.
+///
+/// # Returns
+///
+/// Ok once the directory structure is in place.
+///
+/// # Errors
+///
+/// Returns an error if directories or files cannot be created.
 pub async fn init(
     client: &MoldXClient
 ) -> Result<()> {

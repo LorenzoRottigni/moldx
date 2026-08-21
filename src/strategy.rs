@@ -10,6 +10,16 @@ use crate::template::{Template};
 use crate::command::{Command};
 use crate::types::Entity;
 
+/// Describes how a module can be processed.
+///
+/// A `Strategy` is a directory under the configured strategies directory
+/// containing executable commands and templates:
+///
+/// - [`Command`] scripts live in the configured bin directory.
+/// - [`Template`] directories define the files used to match modules.
+///
+/// Strategies whose templates carry no file names are considered agnostic
+/// and apply to any module.
 #[derive(Debug, Clone)]
 pub struct Strategy {
     pub name: String,
@@ -19,6 +29,27 @@ pub struct Strategy {
 }
 
 impl Strategy {
+    /// Creates a new strategy from the given directory.
+    ///
+    /// Commands and templates are resolved from the strategy directory using
+    /// the naming conventions defined by the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `strategy_dir` - The strategy directory.
+    /// * `config` - The MoldX project configuration.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized [`Strategy`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::InvalidStrategyDir`] if the directory does not
+    /// exist or is not a directory, [`MoldXError::StrategyDirNoFileName`] if
+    /// the directory has no file name, [`MoldXError::InvalidName`] if the
+    /// derived name is not valid, and any error raised while resolving
+    /// commands or templates.
     pub fn new(strategy_dir: PathBuf, config: &MoldXConfig) -> Result<Self> {
         if !strategy_dir.exists() || !strategy_dir.is_dir() {
             return Err(MoldXError::InvalidStrategyDir { path: strategy_dir }.into());
@@ -45,6 +76,24 @@ impl Strategy {
         })
     }
 
+    /// Resolves the commands of a strategy from its bin directory.
+    ///
+    /// Only `.sh` files are considered; entries that cannot be turned into a
+    /// [`Command`] are skipped.
+    ///
+    /// # Arguments
+    ///
+    /// * `strategy_dir` - The strategy directory.
+    /// * `bin_dir_name` - Name of the bin directory inside the strategy.
+    ///
+    /// # Returns
+    ///
+    /// The resolved commands, or an empty vector when there is no bin
+    /// directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bin directory cannot be read.
     pub fn resolve_commands(strategy_dir: &Path, bin_dir_name: &str) -> Result<Vec<Command>> {
         let commands_dir = strategy_dir.join(bin_dir_name);
         if !commands_dir.is_dir() {
@@ -58,6 +107,25 @@ impl Strategy {
             .collect())
     }
 
+    /// Resolves the templates of a strategy.
+    ///
+    /// Both layouts are supported: a singular template directory treated as
+    /// a single template, and a plural templates directory whose
+    /// subdirectories each become a named template.
+    ///
+    /// # Arguments
+    ///
+    /// * `strategy_dir` - The strategy directory.
+    /// * `template_dir_name` - Name of the singular template directory.
+    /// * `templates_dir_name` - Name of the plural templates directory.
+    ///
+    /// # Returns
+    ///
+    /// The resolved templates, singular first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a template directory is invalid or cannot be read.
     pub fn resolve_templates(
         strategy_dir: &Path,
         template_dir_name: &str,
@@ -86,10 +154,27 @@ impl Strategy {
         Ok(templates)
     }
 
+    /// Returns whether the strategy applies independently of module contents.
+    ///
+    /// A strategy is agnostic when it has no templates or when all of its
+    /// templates contain no file names.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the strategy is agnostic.
     pub fn is_agnostic(&self) -> bool {
         self.templates.is_empty() || self.templates.iter().all(|template| template.file_names.is_empty())
     }
 
+    /// Returns the command with the given name, if one exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the command to look up.
+    ///
+    /// # Returns
+    ///
+    /// The matching [`Command`], or `None` if no command has the given name.
     pub fn get_command(&self, name: &String) -> Option<Command> {
         self.commands.iter().find(|c| c.name == *name).cloned()
     }

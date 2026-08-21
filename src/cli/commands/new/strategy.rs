@@ -3,6 +3,25 @@ use crate::errors::MoldXError;
 use anyhow::Result;
 use std::fs;
 
+/// Scaffolds a new strategy directory.
+///
+/// Creates the strategy directory with empty bin and template directories,
+/// each containing a `.keep` placeholder.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `args` - Raw arguments; `args[1]` is the strategy name.
+///
+/// # Returns
+///
+/// Ok once the strategy directory has been created.
+///
+/// # Errors
+///
+/// Returns [`MoldXError::NewStrategyUsage`] when the strategy name is
+/// missing, [`MoldXError::StrategyAlreadyExists`] if the strategy already
+/// exists, and any IO error raised while creating directories or files.
 pub fn new_strategy(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     let strategy_name = args
         .get(1)

@@ -7,6 +7,11 @@ use crate::errors::MoldXError;
 use crate::fs::validate_name;
 use crate::types::Entity;
 
+/// Represents a discovered project module.
+///
+/// A module is a directory matched by at least one non-agnostic strategy.
+/// Matching strategies are stored as indices into the client's strategy
+/// list.
 #[derive(Clone, Debug)]
 pub struct Module {
     pub name: String,
@@ -15,6 +20,22 @@ pub struct Module {
 }
 
 impl Module {
+    /// Creates a new module from the given directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The module directory.
+    /// * `strategies` - Indices of the strategies matching the module.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized [`Module`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MoldXError::ModuleDirNoFileName`] if the directory has no
+    /// file name, and [`MoldXError::InvalidName`] if the derived name is not
+    /// valid.
     pub fn new(dir: PathBuf, strategies: Vec<usize>) -> Result<Self> {
         let name = dir
             .file_name()

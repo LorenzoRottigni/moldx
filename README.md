@@ -397,6 +397,22 @@ Future versions may allow the TUI to connect to the MoldX daemon.
 
 ## Roadmap
 
+### Fix strategy templating
+
+A strategy can have on or more templates.
+If a strategy exposes only 1 template then in its bin must have commands at root level:
+
+- .moldx/startegies/node/template
+- .moldx/startegies/node/bin/build.sh
+
+If a strategy exposes more then 1 template then its bin must have commands as dir with templates names as script.
+
+- moldx/strategies/python/templates/uv
+- moldx/strategies/python/templates/legacy
+
+- .moldx/strategies/python/bin/build/uv.sh
+- .moldx/strategies/python/bin/build/legacy.sh
+
 ### Executor Support
 
 Introduce executors for execution targets other than the default shell executor.

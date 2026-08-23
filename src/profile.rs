@@ -80,9 +80,6 @@ impl Profile {
     }
 
     pub fn get_command(&self, name: &String) -> Option<Command> {
-        self.get_local_command(name).or(
-            self.profiles.iter().find_map(|p| p.get_command(name))
-        )
-        
+        self.profiles.iter().find_map(|p| p.get_command(name)).or(self.get_local_command(name))
     }
 }

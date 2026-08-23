@@ -397,13 +397,15 @@ Future versions may allow the TUI to connect to the MoldX daemon.
 
 ## Roadmap
 
-### Recursive profiles instead of strategies
+### Recursive Profiles instead of Strategies
 
-Profiles represent a secialization of the parent scope.
-Each specialization hold only 1 template for detecting its target.
-Provides natural nesting and removes the concept of agnostic strategy.
+Replace the current flat strategy model with recursive profiles.
 
+A profile represents a specialization of its parent scope. Each profile contains exactly one template used to identify matching modules and may provide commands and further specialized profiles.
 
+This provides a natural hierarchy of specializations, enables command inheritance from parent scopes, and removes the need for an agnostic strategy.
+
+```text
 .moldx/
 ├── bin/
 └── profiles/
@@ -417,6 +419,7 @@ Provides natural nesting and removes the concept of agnostic strategy.
             └── legacy/
                 ├── bin/
                 └── template/
+```
 
 ### Executor Support
 

@@ -397,21 +397,26 @@ Future versions may allow the TUI to connect to the MoldX daemon.
 
 ## Roadmap
 
-### Fix strategy templating
+### Recursive profiles instead of strategies
 
-A strategy can have on or more templates.
-If a strategy exposes only 1 template then in its bin must have commands at root level:
+Profiles represent a secialization of the parent scope.
+Each specialization hold only 1 template for detecting its target.
+Provides natural nesting and removes the concept of agnostic strategy.
 
-- .moldx/startegies/node/template
-- .moldx/startegies/node/bin/build.sh
 
-If a strategy exposes more then 1 template then its bin must have commands as dir with templates names as script.
-
-- moldx/strategies/python/templates/uv
-- moldx/strategies/python/templates/legacy
-
-- .moldx/strategies/python/bin/build/uv.sh
-- .moldx/strategies/python/bin/build/legacy.sh
+.moldx/
+├── bin/
+└── profiles/
+    └── python/
+        ├── bin/
+        ├── template/
+        └── profiles/
+            ├── uv/
+            │   ├── bin/
+            │   └── template/
+            └── legacy/
+                ├── bin/
+                └── template/
 
 ### Executor Support
 

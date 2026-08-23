@@ -18,6 +18,7 @@ pub mod fs;
 pub mod module;
 pub mod strategy;
 pub mod template;
+pub mod profile;
 pub mod tui;
 pub mod types;
 

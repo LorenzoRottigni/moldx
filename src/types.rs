@@ -16,6 +16,7 @@ pub enum Entity {
     Template,
     Module,
     Command,
+    Profile
 }
 
 impl Entity {
@@ -30,6 +31,7 @@ impl Entity {
             Entity::Template => "template",
             Entity::Module => "module",
             Entity::Command => "command",
+            Entity::Profile => "profile",
         }
     }
 }
@@ -69,6 +71,7 @@ impl fmt::Display for Entity {
             Entity::Template => write!(f, "template"),
             Entity::Module => write!(f, "module"),
             Entity::Command => write!(f, "command"),
+            Entity::Profile => write!(f, "profile")
         }
     }
 }

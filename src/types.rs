@@ -10,7 +10,7 @@ use crate::errors::MoldXError;
 ///   modules and strategies.
 /// - [`Module`](Entity::Module) represents a discovered project module.
 /// - [`Command`](Entity::Command) represents an executable strategy script.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Entity {
     Strategy,
     Template,

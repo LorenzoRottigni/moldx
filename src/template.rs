@@ -3,10 +3,10 @@ use std::collections::BTreeSet;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use crate::errors::MoldXError;
-use crate::fs::{file_names_for_dir, validate_dir};
+use crate::errors::{MoldXError2};
+use crate::fs::{file_names_for_dir};
 
 /// Defines the files used to identify modules and strategies.
 ///
@@ -14,48 +14,25 @@ use crate::fs::{file_names_for_dir, validate_dir};
 /// template when it contains at least all of the template's file names.
 #[derive(Debug, Clone)]
 pub struct Template {
-    pub dir: PathBuf,
+    pub path: PathBuf,
     pub file_names: BTreeSet<String>,
 }
 
 impl Template {
-    /// Creates a new template from the given directory.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the template.
-    /// * `template_dir` - The directory containing the template files.
-    ///
-    /// # Returns
-    ///
-    /// A fully initialized [`Template`] with its file names collected.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MoldXError::InvalidTemplateDir`] if the directory does not
-    /// exist or is not a directory, and [`MoldXError::InvalidName`] if the
-    /// name is not valid.
-    pub fn new(template_dir: PathBuf) -> Result<Self> {
-        if !template_dir.exists() || !template_dir.is_dir() {
-            return Err(MoldXError::InvalidTemplateDir { path: template_dir }.into());
+    pub fn new(path: PathBuf) -> Result<Self> {
+        if !path.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path,
+                kind: "template",
+            });
         }
+
         Ok(Self {
-            file_names: file_names_for_dir(&template_dir)?,
-            dir: template_dir,
+            file_names: file_names_for_dir(&path)?,
+            path,
         })
     }
 
-    /// Returns whether the target directory contains all template files.
-    ///
-    /// Templates without file names never match.
-    ///
-    /// # Arguments
-    ///
-    /// * `target` - The directory to test against the template.
-    ///
-    /// # Returns
-    ///
-    /// `true` if every template file name exists in the target directory.
     pub fn matches(&self, target: &Path) -> bool {
         if self.file_names.is_empty() {
             return false;
@@ -70,10 +47,6 @@ impl Template {
 
     pub fn is_child_of(&self, template: &Template) -> bool {
         template.file_names.is_subset(&self.file_names)
-    }
-
-    pub fn validate(&self) -> Result<bool> {
-        validate_dir(&self.dir)
     }
 }
 
@@ -92,9 +65,9 @@ impl Display for Template {
         write!(
             f,
             "{} [{}] {}",
-            self.dir.to_string_lossy().bold().magenta(),
+            self.path.to_string_lossy().bold().magenta(),
             file_names,
-            format!("@ {}", self.dir.display()).dimmed()
+            format!("@ {}", self.path.display()).dimmed()
         )
     }
 }
@@ -112,7 +85,7 @@ mod tests {
         fs::create_dir(&tpl_dir).unwrap();
         fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
         let t = Template::new(tpl_dir.clone()).unwrap();
-        assert_eq!(t.dir, tpl_dir);
+        assert_eq!(t.path, tpl_dir);
         assert!(t.file_names.contains("Dockerfile"));
     }
 

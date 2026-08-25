@@ -3,6 +3,24 @@ use thiserror::Error;
 
 use crate::types::Entity;
 
+#[derive(Error, Debug)]
+pub enum MoldXError2 {
+    #[error("[MoldX Error]: Unable to read {kind} dir: {path}")]
+    PathNotFound { path: PathBuf, kind: &'static str },
+
+    #[error("[MoldX Error]: Unable to determine {entity} name from: {path}")]
+    NameResolutionFailed { path: PathBuf, entity: Entity },
+
+    #[error("[MoldX Error]: Invalid {entity} name: {name}")]
+    InvalidName { entity: Entity, name: String },
+
+    #[error("[MoldX Error]: Parent profile {parent} template must be a subset of child profile template: {child}")]
+    UnmatchedChildProfile { parent: PathBuf, child: PathBuf },
+
+    #[error("[MoldX Error]: Command must be a shell script: {path}")]
+    InvalidCommandFormat { path: PathBuf }
+}
+
 /// Errors produced by MoldX operations.
 ///
 /// Every variant renders a human-readable message through its

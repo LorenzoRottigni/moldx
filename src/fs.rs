@@ -1,3 +1,4 @@
+use crate::errors::MoldXError2;
 use crate::{errors::MoldXError, types::Entity};
 use anyhow::{bail, Result};
 use std::fs;
@@ -119,9 +120,31 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
 /// or is `.` or `..`.
 pub fn validate_name(name: String, entity: Entity) -> Result<()> {
     if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
-        bail!(MoldXError::InvalidName { name, entity });
+        bail!(MoldXError2::InvalidName { name, entity });
     }
     Ok(())
+}
+
+pub fn resolve_name(path: &Path, entity: Entity) -> Result<String> {
+    let name = if path.is_dir() {
+        path.file_name()
+    } else if path.is_file() {
+        path.file_stem()
+    } else {
+        None
+    }
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| MoldXError2::NameResolutionFailed {
+            path: path.to_path_buf(),
+            entity,
+        })?
+        .to_owned();
+
+    if name == "." || name == ".." {
+        bail!(MoldXError2::InvalidName { name, entity });
+    }
+
+    Ok(name)
 }
 
 pub fn validate_dir(dir: &PathBuf) -> Result<bool> {

@@ -2,10 +2,10 @@ use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
-use crate::errors::MoldXError;
-use crate::fs::{is_shell_script, validate_dir, validate_name};
+use crate::errors::{MoldXError, MoldXError2};
+use crate::fs::{is_shell_script, resolve_name, validate_dir, validate_name};
 use crate::types::Entity;
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 /// Represents an executable strategy script.
 ///
@@ -14,47 +14,26 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub struct Command {
     pub name: String,
-    pub dir: PathBuf,
+    pub path: PathBuf,
     pub format: String,
 }
 
 impl Command {
-    /// Creates a new command from the given script path.
-    ///
-    /// # Arguments
-    ///
-    /// * `command_dir` - Path to the command script.
-    ///
-    /// # Returns
-    ///
-    /// A fully initialized [`Command`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MoldXError::CommandNotFound`] if the path is not a `.sh`
-    /// file, and [`MoldXError::InvalidName`] if the file stem cannot be
-    /// determined or the derived name is not valid.
-    pub fn new(command_dir: PathBuf) -> Result<Self> {
-        if !command_dir.is_file() || !is_shell_script(&command_dir) {
-            return Err(MoldXError::CommandNotFound {
-                name: "".into(),
-                path: command_dir,
-            }
-            .into());
+    pub fn new(path: PathBuf) -> Result<Self> {
+        if !path.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path,
+                kind: "template",
+            });
         }
 
-        let name = command_dir
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .ok_or(MoldXError::InvalidName {
-                entity: Entity::Command,
-                name: command_dir.to_string_lossy().to_string(),
-            })?
-            .to_string();
+        if !is_shell_script(&path) {
+            bail!(MoldXError2::InvalidCommandFormat { path })
+        }
 
-        validate_name(name.clone(), Entity::Command)?;
+        let name = resolve_name(&path, Entity::Command)?;
 
-        let format = command_dir
+        let format = path
             .extension()
             .and_then(|ext| ext.to_str())
             .unwrap_or("")
@@ -62,13 +41,9 @@ impl Command {
 
         Ok(Self {
             name,
-            dir: command_dir,
+            path,
             format,
         })
-    }
-
-    pub fn validate(&self) -> Result<bool> {
-        validate_dir(&self.dir)
     }
 }
 
@@ -80,7 +55,7 @@ impl Display for Command {
             self.name.bold().cyan(),
             ".".dimmed(),
             self.format.yellow(),
-            format!("@ {}", self.dir.display()).dimmed()
+            format!("@ {}", self.path.display()).dimmed()
         )
     }
 }
@@ -99,7 +74,7 @@ mod tests {
         let cmd = Command::new(script.clone()).unwrap();
         assert_eq!(cmd.name, "build");
         assert_eq!(cmd.format, "sh");
-        assert_eq!(cmd.dir, script);
+        assert_eq!(cmd.path, script);
     }
 
     #[test]

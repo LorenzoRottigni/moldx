@@ -19,6 +19,7 @@ use std::path::PathBuf;
 pub struct MoldXConfig {
     pub moldx_dir: PathBuf,
     pub strategies_dir: PathBuf,
+    pub bin_dir: PathBuf,
     pub bin_dir_name: String,
     pub template_dir_name: String,
     pub templates_dir_name: String,

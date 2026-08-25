@@ -1,111 +1,83 @@
 use crate::{
-    command::Command,
-    config::MoldXConfig,
-    errors::MoldXError,
-    fs::{sorted_read_dir, validate_dir, validate_name},
-    template::Template,
-    types::Entity,
+    command::Command, config::MoldXConfig, errors::{MoldXError2}, fs::{resolve_name, sorted_read_dir}, template::Template, types::Entity,
 };
-use anyhow::Result;
-use std::path::PathBuf;
+use anyhow::{Result, bail};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Profile {
     pub name: String,
-    pub dir: PathBuf,
-    pub template: Option<Template>,
+    pub path: PathBuf,
+    pub template: Template,
     pub commands: Vec<Command>,
     pub profiles: Vec<Profile>,
 }
 
 impl Profile {
-    pub fn new(dir: PathBuf, config: &MoldXConfig) -> Result<Self> {
-        let name = dir
-            .file_name()
-            .ok_or_else(|| MoldXError::StrategyDirNoFileName { path: dir.clone() })?
-            .to_string_lossy()
-            .into_owned();
+    pub fn new(path: &Path, config: &MoldXConfig) -> Result<Self> {
+        if !path.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: path.to_path_buf(),
+                kind: "profile",
+            });
+        }
 
-        validate_name(name.clone(), Entity::Profile)?;
+        let name = resolve_name(path, Entity::Profile)?;
+        let template = Self::resolve_template(&path.join(&config.template_dir_name))?;
+        let commands = Self::resolve_commands(&path.join(&config.bin_dir_name))?;
+        let profiles = Self::resolve_profiles(&path.join("profiles"), config)?;
 
-        let mut profile = Self {
-            dir,
+        let profile = Self {
             name,
-            template: None,
-            profiles: vec![],
-            commands: vec![],
+            path: path.to_path_buf(),
+            template,
+            commands,
+            profiles,
         };
 
-        profile.load_commands(&config)?;
-        profile.load_profiles(&config)?;
-        profile.load_template(&config)?;
+        profile.validate_children()?;
 
         Ok(profile)
     }
 
-    pub fn resolve_commands(bin_dir: &PathBuf) -> Result<Vec<Command>> {
-        Ok(sorted_read_dir(bin_dir)?
+    pub fn resolve_commands(source: &Path) -> Result<Vec<Command>> {
+        if !source.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: source.to_path_buf(),
+                kind: "profile bin",
+            });
+        }
+
+        sorted_read_dir(source)?
             .into_iter()
-            .filter_map(|e| {
-                e.path()
-                    .is_file()
-                    .then(|| Command::new(e.path()).ok())
-                    .flatten()
-            })
-            .collect())
+            .filter(|e| e.path().is_file())
+            .map(|e| Command::new(e.path()))
+            .collect()
     }
 
-    pub fn load_commands(&mut self, config: &MoldXConfig) -> Result<()> {
-        let commands_dir = self.dir.join(&config.bin_dir_name);
-        if !commands_dir.is_dir() {
-            return Err(MoldXError::PathNotFound { path: commands_dir }.into());
+    pub fn resolve_template(source: &Path) -> Result<Template> {
+        if !source.exists() || !source.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: source.to_path_buf(),
+                kind: "profile template"
+            })
+        }
+        Ok(Template::new(source.to_path_buf())?)
+    }
+
+    pub fn resolve_profiles(
+        source: &Path,
+        config: &MoldXConfig,
+    ) -> Result<Vec<Self>> {
+        if !source.is_dir() {
+            return Ok(vec![]);
         }
 
-        self.commands = sorted_read_dir(&self.dir)?
+        sorted_read_dir(source)?
             .into_iter()
-            .filter_map(|e| {
-                e.path()
-                    .is_file()
-                    .then(|| Command::new(e.path()).ok())
-                    .flatten()
-            })
-            .collect();
-
-        Ok(())
-    }
-
-    pub fn load_template(&mut self, config: &MoldXConfig) -> Result<()> {
-        let template_dir = self.dir.join(&config.template_dir_name);
-
-        // no template dir throw err
-        // templates hireachy unmatch throw err
-        if !template_dir.is_dir() {
-            return Err(MoldXError::TemplateNotFound {
-                strategy: self.name.clone(),
-            }
-            .into());
-        }
-
-        if template_dir.is_dir() {
-            self.template = Some(Template::new(template_dir)?);
-        }
-        Ok(())
-    }
-
-    pub fn load_profiles(&mut self, config: &MoldXConfig) -> Result<()> {
-        let profiles_dir = self.dir.join("profiles");
-        if profiles_dir.is_dir() {
-            self.profiles = sorted_read_dir(&profiles_dir)?
-                .into_iter()
-                .filter_map(|e| {
-                    e.path()
-                        .is_file()
-                        .then(|| Profile::new(e.path(), config).ok())
-                        .flatten()
-                })
-                .collect();
-        }
-        Ok(())
+            .filter(|e| e.path().is_dir())
+            .map(|e| Profile::new(&e.path(), config))
+            .collect()
     }
 
     pub fn get_local_command(&self, name: &String) -> Option<Command> {
@@ -120,41 +92,15 @@ impl Profile {
     }
 
     pub fn is_child_of(&self, profile: &Profile) -> bool {
-        match (&self.template, &profile.template) {
-            (Some(template), Some(parent_template)) => template.is_child_of(parent_template),
-            _ => false,
-        }
-    }
-
-    pub fn validate(&self) -> Result<()> {
-        validate_dir(&self.dir)?;
-
-        self.template
-            .as_ref()
-            .ok_or_else(|| MoldXError::TemplateNotFound {
-                strategy: self.name.clone(),
-            })?
-            .validate()?;
-
-        for profile in &self.profiles {
-            profile.validate()?;
-        }
-
-        for command in &self.commands {
-            command.validate()?;
-        }
-
-        self.validate_children()?;
-
-        Ok(())
+        self.template.is_child_of(&profile.template)
     }
 
     pub fn validate_children(&self) -> Result<()> {
-        if !self.profiles.iter().all(|p| p.is_child_of(self)) {
-            return Err(MoldXError::PhantomChildren {
-                path: self.dir.clone(),
-            }
-            .into());
+        if let Some(child) = self.profiles.iter().find(|p| !p.is_child_of(self)) {
+            bail!(MoldXError2::UnmatchedChildProfile {
+                parent: self.path.clone(),
+                child: child.path.clone(),
+            });
         }
 
         Ok(())

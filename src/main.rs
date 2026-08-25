@@ -9,6 +9,7 @@ use clap::Parser;
 
 pub mod cli;
 pub mod client;
+pub mod client2;
 pub mod command;
 pub mod config;
 pub mod constants;
@@ -16,11 +17,12 @@ pub mod errors;
 pub mod executor;
 pub mod fs;
 pub mod module;
+pub mod profile;
 pub mod strategy;
 pub mod template;
-pub mod profile;
 pub mod tui;
 pub mod types;
+pub mod validator;
 
 /// Runs the MoldX command line application.
 ///
@@ -46,6 +48,6 @@ async fn main() -> Result<()> {
     )?;
     let client = client::MoldXClient::new(config)?;
     print!("{}", client);
-    cli.exec_with(client).await?;
+    cli.exec_with(&client).await?;
     Ok(())
 }

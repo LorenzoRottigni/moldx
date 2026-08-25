@@ -124,6 +124,13 @@ pub fn validate_name(name: String, entity: Entity) -> Result<()> {
     Ok(())
 }
 
+pub fn validate_dir(dir: &PathBuf) -> Result<bool> {
+    if !dir.exists() || !dir.is_dir() {
+        return Err(MoldXError::InvalidStrategyDir { path: dir.clone() }.into());
+    }
+    Ok(true)
+}
+
 /// Searches the filesystem for the first path satisfying a predicate.
 ///
 /// When `traverse_upward` is set, the search starts at `start` and walks up
@@ -307,7 +314,12 @@ mod tests {
         fs::create_dir_all(&sub).unwrap();
         let target = sub.join("target.txt");
         fs::write(&target, "").unwrap();
-        let found = discover_path(root.path(), |p| p.file_name() == Some(OsStr::new("target.txt")), 10, false);
+        let found = discover_path(
+            root.path(),
+            |p| p.file_name() == Some(OsStr::new("target.txt")),
+            10,
+            false,
+        );
         assert!(found.is_ok());
         assert_eq!(found.unwrap(), target);
     }
@@ -315,7 +327,12 @@ mod tests {
     #[test]
     fn test_discover_path_not_found() {
         let root = tempdir().unwrap();
-        let result = discover_path(root.path(), |p| p.file_name() == Some(OsStr::new("nope.txt")), 2, false);
+        let result = discover_path(
+            root.path(),
+            |p| p.file_name() == Some(OsStr::new("nope.txt")),
+            2,
+            false,
+        );
         assert!(result.is_err());
     }
 

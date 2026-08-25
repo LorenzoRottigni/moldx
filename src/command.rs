@@ -1,11 +1,11 @@
-use std::path::PathBuf;
-use std::fmt::{self, Display};
 use owo_colors::OwoColorize;
+use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 use crate::errors::MoldXError;
-use crate::fs::{is_shell_script, validate_name};
+use crate::fs::{is_shell_script, validate_dir, validate_name};
 use crate::types::Entity;
-use anyhow:: Result;
+use anyhow::Result;
 
 /// Represents an executable strategy script.
 ///
@@ -36,13 +36,20 @@ impl Command {
     /// determined or the derived name is not valid.
     pub fn new(command_dir: PathBuf) -> Result<Self> {
         if !command_dir.is_file() || !is_shell_script(&command_dir) {
-            return Err(MoldXError::CommandNotFound { name: "".into(), path: command_dir }.into())
+            return Err(MoldXError::CommandNotFound {
+                name: "".into(),
+                path: command_dir,
+            }
+            .into());
         }
 
         let name = command_dir
             .file_stem()
             .and_then(|stem| stem.to_str())
-            .ok_or(MoldXError::InvalidName { entity: Entity::Command, name: command_dir.to_string_lossy().to_string() })?
+            .ok_or(MoldXError::InvalidName {
+                entity: Entity::Command,
+                name: command_dir.to_string_lossy().to_string(),
+            })?
             .to_string();
 
         validate_name(name.clone(), Entity::Command)?;
@@ -53,9 +60,16 @@ impl Command {
             .unwrap_or("")
             .to_string();
 
-        Ok(Self { name, dir: command_dir, format })
+        Ok(Self {
+            name,
+            dir: command_dir,
+            format,
+        })
     }
 
+    pub fn validate(&self) -> Result<bool> {
+        validate_dir(&self.dir)
+    }
 }
 
 impl Display for Command {
@@ -74,8 +88,8 @@ impl Display for Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_command_new_valid() {

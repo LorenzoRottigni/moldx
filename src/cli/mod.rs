@@ -90,39 +90,8 @@ impl Cli {
     /// # Errors
     ///
     /// Returns an error if the selected subcommand fails.
-    pub async fn exec_with(self, client: MoldXClient) -> Result<()> {
-        match self.command.unwrap_or(Command::Ui) {
-            // moldx [ui]
-            Command::Ui => {
-                commands::ui::ui(&client).await?;
-            }
-
-            // moldx detect <path>
-            Command::Detect { path } => {
-                commands::detect::detect(&client, path).await?;
-            }
-
-            // moldx list [<path>]
-            Command::List { .. } => {
-                commands::list::list(&client).await?;
-            }
-
-            // moldx new [] [] <>
-            Command::New { args } => {
-                commands::new::new(&client, args).await?;
-            }
-
-            // moldx init
-            Command::Init => {
-                commands::init::init(&client).await?;
-            }
-
-            // moldx [strategy] <command> <path>
-            Command::Run(args) => {
-                commands::run::run(&client, args).await?;
-            }
-        }
-        Ok(())
+    pub async fn exec_with(self, client: &MoldXClient) -> Result<()> {
+        self.command.unwrap_or(Command::Ui).exec_with(&client).await
     }
 }
 
@@ -138,11 +107,7 @@ pub enum Command {
     },
 
     /// List all discovered modules under a root path
-    List {
-        /// Optional root path to display
-        #[arg(value_name = "PATH")]
-        path: Option<PathBuf>,
-    },
+    List,
 
     /// Create a new .moldx/ template directory in the current working directory
     Init,
@@ -158,4 +123,17 @@ pub enum Command {
         #[arg(required = true, num_args = 1..=3)]
         args: Vec<String>,
     },
+}
+
+impl Command {
+    async fn exec_with(self, client: &MoldXClient) -> Result<()> {
+        match self {
+            Self::Ui => commands::ui::ui(client).await,
+            Self::Detect { path } => commands::detect::detect(client, path).await,
+            Self::List => commands::list::list(client).await,
+            Self::Init => commands::init::init(client).await,
+            Self::New { args } => commands::new::new(client, args).await,
+            Self::Run(args) => commands::run::run(client, args).await,
+        }
+    }
 }

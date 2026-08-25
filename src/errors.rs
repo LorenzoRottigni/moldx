@@ -70,8 +70,8 @@ pub enum MoldXError {
     #[error("command already exists: {path}")]
     CommandAlreadyExists { path: PathBuf },
 
-    #[error("template not found: {name} for strategy {strategy}")]
-    TemplateNotFound { name: String, strategy: String },
+    #[error("template not found for strategy {strategy}")]
+    TemplateNotFound { strategy: String },
 
     #[error("strategy '{name}' does not expose a scaffoldable template")]
     NoScaffoldableTemplate { name: String },
@@ -119,29 +119,79 @@ mod tests {
     fn test_error_display_all_variants() {
         let errors: Vec<String> = vec![
             MoldXError::CurrentDir.to_string(),
-            MoldXError::Canonicalize { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::InvalidStrategyDir { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::InvalidName { entity: Entity::Strategy, name: "bad".into() }.to_string(),
-            MoldXError::StrategyDirNoFileName { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::InvalidTemplateDir { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::InvalidStrategiesDir { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::ModuleDirNoFileName { path: PathBuf::from("/p") }.to_string(),
+            MoldXError::Canonicalize {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::InvalidStrategyDir {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::InvalidName {
+                entity: Entity::Strategy,
+                name: "bad".into(),
+            }
+            .to_string(),
+            MoldXError::StrategyDirNoFileName {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::InvalidTemplateDir {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::InvalidStrategiesDir {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::ModuleDirNoFileName {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
             MoldXError::UnknownEntity { entity: "x".into() }.to_string(),
             MoldXError::ProcessSpawnFailed { reason: "r".into() }.to_string(),
             MoldXError::ProcessWaitFailed { reason: "r".into() }.to_string(),
             MoldXError::ProcessNonZeroExit { code: 1 }.to_string(),
             MoldXError::TerminalUnavailable.to_string(),
-            MoldXError::PathNotFound { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::StrategyNotAvailable { name: "s".into(), path: PathBuf::from("/p") }.to_string(),
-            MoldXError::CommandNotFoundInStrategy { name: "c".into(), strategy: "s".into() }.to_string(),
-            MoldXError::CommandNotFound { name: "c".into(), path: PathBuf::from("/p") }.to_string(),
-            MoldXError::StrategyAlreadyExists { path: PathBuf::from("/p") }.to_string(),
+            MoldXError::PathNotFound {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::StrategyNotAvailable {
+                name: "s".into(),
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::CommandNotFoundInStrategy {
+                name: "c".into(),
+                strategy: "s".into(),
+            }
+            .to_string(),
+            MoldXError::CommandNotFound {
+                name: "c".into(),
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::StrategyAlreadyExists {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
             MoldXError::StrategyNotFound { name: "s".into() }.to_string(),
-            MoldXError::CommandAlreadyExists { path: PathBuf::from("/p") }.to_string(),
-            MoldXError::TemplateNotFound { name: "t".into(), strategy: "s".into() }.to_string(),
+            MoldXError::CommandAlreadyExists {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
+            MoldXError::TemplateNotFound {
+                name: "t".into(),
+                strategy: "s".into(),
+            }
+            .to_string(),
             MoldXError::NoScaffoldableTemplate { name: "s".into() }.to_string(),
             MoldXError::MultipleTemplates { name: "s".into() }.to_string(),
-            MoldXError::ModulePathAlreadyExists { path: PathBuf::from("/p") }.to_string(),
+            MoldXError::ModulePathAlreadyExists {
+                path: PathBuf::from("/p"),
+            }
+            .to_string(),
             MoldXError::NewUsage.to_string(),
             MoldXError::RunUsage.to_string(),
             MoldXError::TooManyArguments.to_string(),

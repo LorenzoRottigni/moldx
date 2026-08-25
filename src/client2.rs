@@ -1,9 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::config::MoldXConfig;
-use crate::errors::MoldXError;
 use crate::executor::Executor;
-use crate::fs::{is_ignored_name, sorted_read_dir};
 use crate::module::Module;
 use crate::profile::Profile;
 
@@ -21,32 +19,15 @@ pub struct MoldXClient {
 impl MoldXClient {
     pub fn new(config: MoldXConfig) -> Result<Self> {
         let mut client = Self {
-            profiles: vec![],
+            profiles: Profile::resolve_profiles(&config.strategies_dir, &config)?,
             modules: vec![],
             config,
             executor: Executor::new(),
         };
-        client.load_profiles();
-        client.load_modules();
+        client.load_modules()?;
         Ok(client)
     }
 
-    pub fn load_profiles(&mut self) -> Result<()> {
-        let profiles_dir = &self.config.strategies_dir;
-        if !profiles_dir.exists() || !profiles_dir.is_dir() {
-            return Err(MoldXError::InvalidStrategiesDir {
-                path: profiles_dir.clone(),
-            }
-            .into());
-        }
-        self.profiles = sorted_read_dir(profiles_dir)?
-            .into_iter()
-            .filter(|e| e.path().is_dir() && !is_ignored_name(&e.file_name().to_string_lossy()))
-            .map(|e| Profile::new(e.path(), &self.config))
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(())
-    }
 
     pub fn load_modules(&mut self) -> Result<()> {
         let mut modules: Vec<Module> = Vec::new();
@@ -76,7 +57,7 @@ impl MoldXClient {
                 .profiles
                 .iter()
                 .enumerate()
-                .filter(|(_, profile)| profile.template.as_ref().is_some_and(|t| t.matches(path)))
+                .filter(|(_, profile)| profile.template.matches(path))
                 .map(|(index, _)| index)
                 .collect::<BTreeSet<_>>();
 

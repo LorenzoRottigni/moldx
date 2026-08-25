@@ -23,8 +23,8 @@ impl Profile {
         }
 
         let name = resolve_name(path, Entity::Profile)?;
-        let template = Self::resolve_template(&path.join(&config.template_dir_name))?;
-        let commands = Self::resolve_commands(&path.join(&config.bin_dir_name))?;
+        let template = Template::new(path.join(&config.template_dir_name))?;
+        let commands = Command::resolve_commands(&path.join(&config.bin_dir_name))?;
         let profiles = Self::resolve_profiles(&path.join("profiles"), config)?;
 
         let profile = Self {
@@ -38,31 +38,6 @@ impl Profile {
         profile.validate_children()?;
 
         Ok(profile)
-    }
-
-    pub fn resolve_commands(source: &Path) -> Result<Vec<Command>> {
-        if !source.is_dir() {
-            bail!(MoldXError2::PathNotFound {
-                path: source.to_path_buf(),
-                kind: "profile bin",
-            });
-        }
-
-        sorted_read_dir(source)?
-            .into_iter()
-            .filter(|e| e.path().is_file())
-            .map(|e| Command::new(e.path()))
-            .collect()
-    }
-
-    pub fn resolve_template(source: &Path) -> Result<Template> {
-        if !source.exists() || !source.is_dir() {
-            bail!(MoldXError2::PathNotFound {
-                path: source.to_path_buf(),
-                kind: "profile template"
-            })
-        }
-        Ok(Template::new(source.to_path_buf())?)
     }
 
     pub fn resolve_profiles(

@@ -1,9 +1,9 @@
 use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::errors::{MoldXError, MoldXError2};
-use crate::fs::{is_shell_script, resolve_name, validate_dir, validate_name};
+use crate::fs::{is_shell_script, resolve_name, sorted_read_dir, validate_dir, validate_name};
 use crate::types::Entity;
 use anyhow::{Result, bail};
 
@@ -20,7 +20,7 @@ pub struct Command {
 
 impl Command {
     pub fn new(path: PathBuf) -> Result<Self> {
-        if !path.is_dir() {
+        if !path.is_file() {
             bail!(MoldXError2::PathNotFound {
                 path,
                 kind: "template",
@@ -44,6 +44,21 @@ impl Command {
             path,
             format,
         })
+    }
+
+    pub fn resolve_commands(source: &Path) -> Result<Vec<Command>> {
+        if !source.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: source.to_path_buf(),
+                kind: "profile bin",
+            });
+        }
+
+        sorted_read_dir(source)?
+            .into_iter()
+            .filter(|e| e.path().is_file())
+            .map(|e| Command::new(e.path()))
+            .collect()
     }
 }
 

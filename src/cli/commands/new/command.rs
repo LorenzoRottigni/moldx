@@ -1,12 +1,12 @@
 use crate::client::MoldXClient;
-use crate::errors::MoldXError;
+use crate::errors::MoldXError2;
 use anyhow::Result;
 use std::{fs, io::Write};
 
-/// Scaffolds a new command script in a strategy's bin directory.
+/// Scaffolds a new command script in a profile's bin directory.
 ///
-/// Accepts either `<command>` (defaulting to the `default` strategy) or
-/// `<strategy> <command>`. The generated script is executable and receives
+/// Accepts either `<command>` (defaulting to the `default` profile) or
+/// `<profile> <command>`. The generated script is executable and receives
 /// the module path as its first argument.
 ///
 /// # Arguments
@@ -20,30 +20,30 @@ use std::{fs, io::Write};
 ///
 /// # Errors
 ///
-/// Returns [`MoldXError::NewCommandUsage`] on malformed arguments,
-/// [`MoldXError::StrategyNotFound`] if the strategy does not exist,
-/// [`MoldXError::CommandAlreadyExists`] if the script already exists, and
+/// Returns [`MoldXError2::NewUsage`] on malformed arguments,
+/// [`MoldXError2::ProfileNotFound`] if the profile does not exist,
+/// [`MoldXError2::CommandAlreadyExists`] if the script already exists, and
 /// any IO error raised while writing the script.
 pub fn new_command(client: &MoldXClient, args: Vec<String>) -> Result<()> {
-    let (strategy_name, command_name) = match args.len() {
+    let (profile_name, command_name) = match args.len() {
         2 => ("default".to_string(), args[1].clone()),
         3 => (args[1].clone(), args[2].clone()),
-        _ => return Err(MoldXError::NewCommandUsage.into()),
+        _ => return Err(MoldXError2::NewUsage.into()),
     };
-    let strategy_dir = client.config.strategies_dir.join(&strategy_name);
-    if !strategy_dir.exists() {
-        return Err(MoldXError::StrategyNotFound { name: strategy_name }.into());
+    let profile_dir = client.config.profiles_dir.join(&profile_name);
+    if !profile_dir.exists() {
+        return Err(MoldXError2::ProfileNotFound { name: profile_name }.into());
     }
-    let bin_dir = strategy_dir.join(&client.config.bin_dir_name);
+    let bin_dir = profile_dir.join(&client.config.bin_dir_name);
     fs::create_dir_all(&bin_dir)?;
     let script_path = bin_dir.join(format!("{}.sh", command_name));
     if script_path.exists() {
-        return Err(MoldXError::CommandAlreadyExists { path: script_path }.into());
+        return Err(MoldXError2::CommandAlreadyExists { path: script_path }.into());
     }
     let mut file = fs::File::create(&script_path)?;
     let script = format!(
         "#!/usr/bin/env bash\nset -euo pipefail\nMODULE_PATH=\"$1\"\nprintf '[moldx] {} {}\\n'\n",
-        strategy_name, command_name
+        profile_name, command_name
     );
     file.write_all(script.as_bytes())?;
     #[cfg(unix)]
@@ -65,11 +65,12 @@ mod tests {
 
     fn make_client(dir: &std::path::Path) -> MoldXClient {
         let moldx_dir = dir.join(".moldx");
-        let strategies_dir = moldx_dir.join("strategies");
-        fs::create_dir_all(&strategies_dir).unwrap();
+        let profiles_dir = moldx_dir.join("profiles");
+        fs::create_dir_all(&profiles_dir).unwrap();
         let config = crate::config::MoldXConfig {
             moldx_dir,
-            strategies_dir,
+            profiles_dir,
+            profiles_dir_name: "profiles".into(),
             bin_dir_name: "bin".into(),
             template_dir_name: "template".into(),
             templates_dir_name: "templates".into(),
@@ -79,31 +80,37 @@ mod tests {
         MoldXClient::new(config).unwrap()
     }
 
+    fn create_profile(dir: &std::path::Path, name: &str) {
+        let profile_dir = dir.join(".moldx/profiles").join(name);
+        fs::create_dir_all(profile_dir.join("bin")).unwrap();
+        fs::create_dir_all(profile_dir.join("template")).unwrap();
+    }
+
     #[test]
-    fn test_new_command_default_strategy() {
+    fn test_new_command_default_profile() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".moldx/strategies/default/bin")).unwrap();
+        create_profile(dir.path(), "default");
         let client = make_client(dir.path());
         let result = new_command(&client, vec!["command".into(), "build".into()]);
         assert!(result.is_ok());
-        let script = dir.path().join(".moldx/strategies/default/bin/build.sh");
+        let script = dir.path().join(".moldx/profiles/default/bin/build.sh");
         assert!(script.exists());
         let content = fs::read_to_string(&script).unwrap();
         assert!(content.contains("build"));
     }
 
     #[test]
-    fn test_new_command_explicit_strategy() {
+    fn test_new_command_explicit_profile() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".moldx/strategies/docker/bin")).unwrap();
+        create_profile(dir.path(), "docker");
         let client = make_client(dir.path());
         let result = new_command(&client, vec!["command".into(), "docker".into(), "deploy".into()]);
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/strategies/docker/bin/deploy.sh").exists());
+        assert!(dir.path().join(".moldx/profiles/docker/bin/deploy.sh").exists());
     }
 
     #[test]
-    fn test_new_command_strategy_not_found() {
+    fn test_new_command_profile_not_found() {
         let dir = tempdir().unwrap();
         let client = make_client(dir.path());
         let result = new_command(&client, vec!["command".into(), "nonexistent".into(), "build".into()]);
@@ -113,9 +120,8 @@ mod tests {
     #[test]
     fn test_new_command_already_exists() {
         let dir = tempdir().unwrap();
-        let bin_dir = dir.path().join(".moldx/strategies/default/bin");
-        fs::create_dir_all(&bin_dir).unwrap();
-        fs::write(bin_dir.join("build.sh"), "").unwrap();
+        create_profile(dir.path(), "default");
+        fs::write(dir.path().join(".moldx/profiles/default/bin/build.sh"), "").unwrap();
         let client = make_client(dir.path());
         let result = new_command(&client, vec!["command".into(), "build".into()]);
         assert!(result.is_err());
@@ -134,10 +140,10 @@ mod tests {
     fn test_new_command_executable_permissions() {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".moldx/strategies/default/bin")).unwrap();
+        create_profile(dir.path(), "default");
         let client = make_client(dir.path());
         new_command(&client, vec!["command".into(), "test".into()]).unwrap();
-        let script = dir.path().join(".moldx/strategies/default/bin/test.sh");
+        let script = dir.path().join(".moldx/profiles/default/bin/test.sh");
         let perms = fs::metadata(&script).unwrap().permissions();
         assert_eq!(perms.mode() & 0o777, 0o755);
     }

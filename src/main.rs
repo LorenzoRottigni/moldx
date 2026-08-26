@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
     let config = config::MoldXConfig::new(
         cli.moldx_dir.clone(),
-        cli.strategies_dir_name.clone(),
+        cli.profiles_dir_name.clone(),
         cli.bin_dir_name.clone(),
         cli.template_dir_name.clone(),
         cli.templates_dir_name.clone(),

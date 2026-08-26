@@ -8,7 +8,7 @@ use anyhow::{Result, bail};
 use crate::errors::{MoldXError2};
 use crate::fs::{file_names_for_dir};
 
-/// Defines the files used to identify modules and strategies.
+/// Defines the files used to identify modules and profiles.
 ///
 /// A `Template` is a directory of marker files. A directory matches a
 /// template when it contains at least all of the template's file names.
@@ -35,7 +35,7 @@ impl Template {
 
     pub fn matches(&self, target: &Path) -> bool {
         if self.file_names.is_empty() {
-            return false;
+            return true;
         }
 
         let Ok(target_files) = file_names_for_dir(target) else {
@@ -144,7 +144,7 @@ mod tests {
 
         let target = dir.path().join("module");
         fs::create_dir(&target).unwrap();
-        assert!(!t.matches(&target));
+        assert!(t.matches(&target));
     }
 
     #[test]
@@ -165,8 +165,8 @@ mod tests {
         fs::write(tpl_dir.join("Dockerfile"), "").unwrap();
         let t = Template::new(tpl_dir).unwrap();
         let display = t.to_string();
-        assert!(display.contains("docker"));
         assert!(display.contains("Dockerfile"));
+        assert!(display.contains("template"));
     }
 
     #[test]

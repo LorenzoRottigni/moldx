@@ -1,9 +1,9 @@
 mod command;
 mod module;
-mod strategy;
+mod profile;
 mod template;
 
-use crate::{client::MoldXClient, types::Entity, errors::MoldXError};
+use crate::{client::MoldXClient, types::Entity, errors::MoldXError2};
 use anyhow::Result;
 
 /// Scaffolds a new MoldX entity.
@@ -22,18 +22,18 @@ use anyhow::Result;
 ///
 /// # Errors
 ///
-/// Returns [`MoldXError::NewUsage`] when no arguments are given, and any
+/// Returns [`MoldXError2::NewUsage`] when no arguments are given, and any
 /// error raised while parsing the entity or scaffolding it.
 pub async fn new(client: &MoldXClient, args: Vec<String>) -> Result<()> {
     if args.is_empty() {
-        return Err(MoldXError::NewUsage.into());
+        return Err(MoldXError2::NewUsage.into());
     }
 
     let entity = args[0]
         .parse::<Entity>()?;
 
     match entity {
-        Entity::Strategy => strategy::new_strategy(client, args)?,
+        Entity::Profile => profile::new_profile(client, args)?,
         Entity::Template => template::new_template(client, args)?,
         Entity::Module => module::new_module(client, args)?,
         Entity::Command => command::new_command(client, args)?
@@ -50,11 +50,12 @@ mod tests {
 
     fn make_client(dir: &std::path::Path) -> MoldXClient {
         let moldx_dir = dir.join(".moldx");
-        let strategies_dir = moldx_dir.join("strategies");
-        fs::create_dir_all(&strategies_dir).unwrap();
+        let profiles_dir = moldx_dir.join("profiles");
+        fs::create_dir_all(&profiles_dir).unwrap();
         let config = crate::config::MoldXConfig {
             moldx_dir,
-            strategies_dir,
+            profiles_dir,
+            profiles_dir_name: "profiles".into(),
             bin_dir_name: "bin".into(),
             template_dir_name: "template".into(),
             templates_dir_name: "templates".into(),
@@ -62,6 +63,12 @@ mod tests {
             max_resolution_depth: 20,
         };
         MoldXClient::new(config).unwrap()
+    }
+
+    fn create_profile(dir: &std::path::Path, name: &str) {
+        let profile_dir = dir.join(".moldx/profiles").join(name);
+        fs::create_dir_all(profile_dir.join("bin")).unwrap();
+        fs::create_dir_all(profile_dir.join("template")).unwrap();
     }
 
     #[tokio::test]
@@ -81,32 +88,32 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_new_strategy() {
+    async fn test_new_profile() {
         let dir = tempdir().unwrap();
         let client = make_client(dir.path());
-        let result = new(&client, vec!["strategy".into(), "mystrat".into()]).await;
+        let result = new(&client, vec!["profile".into(), "myprofile".into()]).await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/strategies/mystrat").exists());
+        assert!(dir.path().join(".moldx/profiles/myprofile").exists());
     }
 
     #[tokio::test]
     async fn test_new_template() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".moldx/strategies/default")).unwrap();
+        create_profile(dir.path(), "default");
         let client = make_client(dir.path());
         let result = new(&client, vec!["template".into(), "mytpl".into()]).await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/strategies/default/templates/mytpl").exists());
+        assert!(dir.path().join(".moldx/profiles/default/templates/mytpl").exists());
     }
 
     #[tokio::test]
     async fn test_new_command() {
         let dir = tempdir().unwrap();
-        fs::create_dir_all(dir.path().join(".moldx/strategies/default/bin")).unwrap();
+        create_profile(dir.path(), "default");
         let client = make_client(dir.path());
         let result = new(&client, vec!["command".into(), "build".into()]).await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/strategies/default/bin/build.sh").exists());
+        assert!(dir.path().join(".moldx/profiles/default/bin/build.sh").exists());
     }
 
     #[tokio::test]

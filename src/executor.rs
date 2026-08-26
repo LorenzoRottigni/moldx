@@ -71,7 +71,7 @@ impl Display for ProcessStatus {
 pub struct RunningProcess {
     pub id: u64,
     pub module_path: String,
-    pub strategy: String,
+    pub profile: String,
     pub command: String,
     pub pid: Option<u32>,
     pub started_at: SystemTime,
@@ -87,7 +87,7 @@ pub struct RunningProcess {
 pub struct ProcessSummary {
     pub id: u64,
     pub module_path: String,
-    pub strategy: String,
+    pub profile: String,
     pub command: String,
     pub pid: Option<u32>,
     pub started_at: SystemTime,
@@ -95,20 +95,20 @@ pub struct ProcessSummary {
 }
 
 #[derive(Debug, Default)]
-struct state {
+struct State {
     processes: Vec<RunningProcess>,
     next_id: u64,
 }
 
 /// Handles command execution and process tracking.
 ///
-/// `Executor` spawns strategy scripts both in the background and in
+/// `Executor` spawns profile scripts both in the background and in
 /// blocking mode, and keeps shared state for tracked processes so their
 /// status and output can be inspected from other tasks.
 #[derive(Debug)]
 pub struct Executor {
     processes: HashMap<PID, Child>,
-    state: Arc<Mutex<state>>,
+    state: Arc<Mutex<State>>,
 }
 
 impl Clone for Executor {
@@ -129,7 +129,7 @@ impl Executor {
     pub fn new() -> Self {
         Self {
             processes: HashMap::new(),
-            state: Arc::new(Mutex::new(state {
+            state: Arc::new(Mutex::new(State {
                 processes: Vec::new(),
                 next_id: 0,
             })),
@@ -209,21 +209,21 @@ impl Executor {
     /// # Arguments
     ///
     /// * `module_path` - Path of the module the process runs against.
-    /// * `strategy` - Name of the strategy being executed.
+    /// * `profile` - Name of the profile being executed.
     /// * `command` - Name of the command being executed.
     /// * `pid` - Operating system PID, if already known.
     ///
     /// # Returns
     ///
     /// The unique identifier assigned to the tracked process.
-    pub fn add_process(&self, module_path: &str, strategy: &str, command: &str, pid: Option<u32>) -> u64 {
+    pub fn add_process(&self, module_path: &str, profile: &str, command: &str, pid: Option<u32>) -> u64 {
         let mut g = self.state.lock().unwrap();
         let id = g.next_id;
         g.next_id += 1;
         g.processes.push(RunningProcess {
             id,
             module_path: module_path.to_string(),
-            strategy: strategy.to_string(),
+            profile: profile.to_string(),
             command: command.to_string(),
             pid,
             started_at: SystemTime::now(),
@@ -294,7 +294,7 @@ impl Executor {
             .map(|p| ProcessSummary {
                 id: p.id,
                 module_path: p.module_path.clone(),
-                strategy: p.strategy.clone(),
+                profile: p.profile.clone(),
                 command: p.command.clone(),
                 pid: p.pid,
                 started_at: p.started_at,
@@ -380,7 +380,7 @@ impl Display for Executor {
                 "  {} {} · {}/{} · pid={:?} · {}",
                 format!("#{}", process.id).dimmed(),
                 process.module_path.green(),
-                process.strategy.cyan(),
+                process.profile.cyan(),
                 process.command.cyan(),
                 process.pid,
                 process.status
@@ -445,7 +445,7 @@ mod tests {
         let summaries = executor.get_summaries();
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].module_path, "/path/to/module");
-        assert_eq!(summaries[0].strategy, "docker");
+        assert_eq!(summaries[0].profile, "docker");
         assert_eq!(summaries[0].command, "build");
         assert_eq!(summaries[0].pid, Some(1234));
         assert!(summaries[0].status.is_running());

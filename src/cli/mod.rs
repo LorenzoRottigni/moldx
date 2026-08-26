@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use crate::client::MoldXClient;
 use crate::constants::DEFAULT_BIN_DIR_NAME;
 use crate::constants::DEFAULT_MAX_RESOLUTION_DEPTH;
-use crate::constants::DEFAULT_STRATEGIES_DIR_NAME;
+use crate::constants::DEFAULT_PROFILES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
 use crate::constants::MOLDX_DIR_NAME;
@@ -31,12 +31,12 @@ pub struct Cli {
     pub moldx_dir: String,
 
     #[arg(
-        long = "strategies-dir-name",
-        env = "MOLDX_STRATEGIES_DIR_NAME",
+        long = "profiles-dir-name",
+        env = "MOLDX_PROFILES_DIR_NAME",
         global = true,
-        default_value = DEFAULT_STRATEGIES_DIR_NAME
+        default_value = DEFAULT_PROFILES_DIR_NAME
     )]
-    pub strategies_dir_name: String,
+    pub profiles_dir_name: String,
 
     #[arg(
         long = "bin-dir-name",
@@ -100,7 +100,7 @@ pub enum Command {
     /// Launch the interactive terminal UI
     Ui,
 
-    /// Detect available strategies for a given path
+    /// Detect available profiles for a given path
     Detect {
         /// Target module path
         path: PathBuf,
@@ -109,17 +109,17 @@ pub enum Command {
     /// List all discovered modules under a root path
     List,
 
-    /// Create a new .moldx/ template directory in the current working directory
+    /// Create a new .moldx/ directory structure in the current working directory
     Init,
 
-    /// Run a command: moldx [strategy] <command> <path>
-    /// Strategy is optional; if omitted, the best matching strategy variant is used.
+    /// Run a command: moldx [profile] <command> <path>
+    /// Profile is optional; if omitted, the best matching profile is used.
     #[command(external_subcommand)]
     Run(Vec<String>),
 
-    /// Scaffold command scripts in .moldx/bin
+    /// Scaffold new MoldX entities (profile, module, command)
     New {
-        /// Arguments: either `<command>` or `<strategy> <command>`
+        /// Arguments: either `<command>` or `<profile> <command>`
         #[arg(required = true, num_args = 1..=3)]
         args: Vec<String>,
     },

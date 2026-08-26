@@ -51,9 +51,9 @@ fn detect_rust_module() {
 }
 
 #[test]
-fn detect_multi_strategy_module_reports_all() {
+fn detect_multi_profile_module_reports_all() {
     moldx()
-        .args(["detect", module("multi-strategy").to_str().unwrap()])
+        .args(["detect", module("multi-profile").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker"))
@@ -66,19 +66,19 @@ fn detect_multi_strategy_module_reports_all() {
 #[test]
 fn list_discovers_all_modules() {
     moldx()
-        .args(["list", playground().to_str().unwrap()])
+        .args(["list"])
         .assert()
         .success()
         .stdout(contains("auth-service"))
         .stdout(contains("api-server"))
         .stdout(contains("worker"))
-        .stdout(contains("multi-strategy"));
+        .stdout(contains("multi-profile"));
 }
 
 #[test]
-fn list_shows_strategy_names() {
+fn list_shows_profile_names() {
     moldx()
-        .args(["list", playground().to_str().unwrap()])
+        .args(["list"])
         .assert()
         .success()
         .stdout(contains("docker"))
@@ -86,11 +86,10 @@ fn list_shows_strategy_names() {
         .stdout(contains("rust"));
 }
 
-// ── run (moldx <strategy> <command> <path>) ───────────────────────────────────
+// ── run (moldx <profile> <command> <path>) ───────────────────────────────────
 
 #[test]
-fn run_without_strategy_uses_first_detected() {
-    // auth-service only has docker, so it should auto-select docker/build
+fn run_without_profile_uses_first_detected() {
     moldx()
         .args(["build", module("auth-service").to_str().unwrap()])
         .assert()
@@ -99,7 +98,7 @@ fn run_without_strategy_uses_first_detected() {
 }
 
 #[test]
-fn run_without_strategy_fails_for_unknown_command() {
+fn run_without_profile_fails_for_unknown_command() {
     moldx()
         .args(["nonexistent_cmd", module("auth-service").to_str().unwrap()])
         .assert()
@@ -135,9 +134,9 @@ fn run_rust_build_succeeds() {
 }
 
 #[test]
-fn run_command_on_multi_strategy_module() {
+fn run_command_on_multi_profile_module() {
     moldx()
-        .args(["docker", "logs", module("multi-strategy").to_str().unwrap()])
+        .args(["docker", "logs", module("multi-profile").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker/logs"));
@@ -146,8 +145,7 @@ fn run_command_on_multi_strategy_module() {
 // ── validation failures ───────────────────────────────────────────────────────
 
 #[test]
-fn run_fails_for_unavailable_strategy() {
-    // auth-service has only docker; node should be rejected
+fn run_fails_for_unavailable_profile() {
     moldx()
         .args(["node", "build", module("auth-service").to_str().unwrap()])
         .assert()
@@ -165,7 +163,7 @@ fn run_fails_for_unknown_command() {
         ])
         .assert()
         .failure()
-        .stderr(contains("variant"));
+        .stderr(contains("not found in profile"));
 }
 
 #[test]
@@ -174,7 +172,7 @@ fn run_fails_for_nonexistent_path() {
         .args(["docker", "build", "/nonexistent/path/to/module"])
         .assert()
         .failure()
-        .stderr(contains("does not exist"));
+        .stderr(contains("Unable to read"));
 }
 
 #[test]
@@ -186,16 +184,7 @@ fn run_fails_with_too_few_arguments() {
 }
 
 #[test]
-fn run_agnostic_command_without_strategy_succeeds() {
-    moldx()
-        .args(["diff", module("auth-service").to_str().unwrap()])
-        .assert()
-        .success()
-        .stdout(contains("agnostic/diff"));
-}
-
-#[test]
-fn new_module_scaffolds_from_strategy_template() {
+fn new_module_scaffolds_from_profile_template() {
     let tmp = TempDir::new().unwrap();
     let target = tmp.path().join("scaffolded-service");
 

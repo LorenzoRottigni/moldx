@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! ┌─ Modules ───────────────┬─ Commands ──────────────┬─ Running ─────────┐
-//! │                          │ [strategy] command       │ #id strat/cmd     │
+//! │                          │ [profile] command        │ #id profile/cmd   │
 //! │                          │ ...                      │ status            │
 //! │                          │                          ├───────────────────┤
 //! │                          │                          │ output lines      │
@@ -133,7 +133,7 @@ struct TuiApp {
 /// A command entry shown in the Commands panel.
 #[derive(Debug, Clone)]
 struct CommandItem {
-    strategy: String,
+    profile: String,
     command: Command,
 }
 
@@ -161,17 +161,17 @@ impl TuiApp {
         self.command_idx = 0;
         if let Some(m) = self.modules.get(self.module_idx) {
             let mut resolved: Vec<(&str, &Command)> = Vec::new();
-            for &strategy_index in &m.strategies {
-                if let Some(strategy) = self.client.strategies.get(strategy_index) {
-                    for command in &strategy.commands {
-                        resolved.push((&strategy.name, command));
+            for &profile_index in &m.profiles {
+                if let Some(profile) = self.client.profiles.get(profile_index) {
+                    for command in &profile.commands {
+                        resolved.push((&profile.name, command));
                     }
                 }
             }
             resolved.sort_by(|a, b| a.0.cmp(b.0).then_with(|| a.1.name.cmp(&b.1.name)));
-            for (strategy_name, command) in resolved {
+            for (profile_name, command) in resolved {
                 self.command_items.push(CommandItem {
-                    strategy: strategy_name.to_string(),
+                    profile: profile_name.to_string(),
                     command: command.clone(),
                 });
             }
@@ -222,20 +222,20 @@ impl TuiApp {
 
     fn run_selected_command(&mut self) {
         let module = match self.selected_module() {
-            Some(m) => m.dir.clone(),
+            Some(m) => m.path.clone(),
             None => return,
         };
         let item = match self.command_items.get(self.command_idx) {
             Some(item) => item.clone(),
             None => return,
         };
-        let strategy = item.strategy.clone();
+        let profile = item.profile.clone();
         let command = item.command.name.clone();
-        let script = item.command.dir.clone();
+        let script = item.command.path.clone();
 
         let id = self.client.executor.add_process(
             &module.to_string_lossy(),
-            &strategy,
+            &profile,
             &command,
             None,
         );
@@ -243,7 +243,7 @@ impl TuiApp {
         self.log.push(format!(
             "Spawned #{}: {}/{} on {}",
             id,
-            strategy,
+            profile,
             command,
             module.display()
         ));
@@ -488,13 +488,13 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, m)| {
-            let name = m.dir.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-            let rel = m.dir.to_string_lossy();
-            let strategy_list = {
+            let name = m.path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            let rel = m.path.to_string_lossy();
+            let profile_list = {
                 let mut names: Vec<&str> = m
-                    .strategies
+                    .profiles
                     .iter()
-                    .filter_map(|&idx| app.client.strategies.get(idx).map(|s| s.name.as_str()))
+                    .filter_map(|&idx| app.client.profiles.get(idx).map(|p| p.name.as_str()))
                     .collect();
                 names.sort();
                 names.join(", ")
@@ -515,7 +515,7 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
                     Style::default().fg(Color::DarkGray),
                 )),
                 Line::from(Span::styled(
-                    format!("  [{}]", strategy_list),
+                    format!("  [{}]", profile_list),
                     Style::default().fg(Color::Blue),
                 )),
             ])
@@ -541,7 +541,7 @@ fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     let active = app.active_panel == Panel::Commands;
     let module_name = app
         .selected_module()
-        .and_then(|m| m.dir.file_name())
+        .and_then(|m| m.path.file_name())
         .and_then(|n| n.to_str())
         .unwrap_or("\u{2014}")
         .to_string();
@@ -577,7 +577,7 @@ fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
             };
             ListItem::new(Line::from(vec![
                 Span::styled(
-                    format!("[{}] ", item.strategy),
+                    format!("[{}] ", item.profile),
                     Style::default().fg(Color::Magenta),
                 ),
                 Span::styled(item.command.name.as_str(), style),
@@ -635,7 +635,7 @@ fn draw_running(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
                 ListItem::new(vec![
                     Line::from(vec![
                         Span::styled(format!("#{} ", p.id), Style::default().fg(Color::DarkGray)),
-                        Span::styled(format!("{}/{}", p.strategy, p.command), label_style),
+                        Span::styled(format!("{}/{}", p.profile, p.command), label_style),
                     ]),
                     Line::from(vec![
                         Span::styled(
@@ -727,7 +727,7 @@ fn draw_help(frame: &mut Frame, area: Rect) {
 ///
 /// # Arguments
 ///
-/// * `client` - The client whose strategies and modules populate the UI.
+/// * `client` - The client whose profiles and modules populate the UI.
 ///
 /// # Returns
 ///
@@ -746,7 +746,7 @@ pub async fn run(client: &MoldXClient) -> Result<()> {
     }));
 
     let client = Arc::new(MoldXClient {
-        strategies: client.strategies.clone(),
+        profiles: client.profiles.clone(),
         modules: client.modules.clone(),
         config: client.config.clone(),
         executor: Executor::new(),

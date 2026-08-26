@@ -10,6 +10,7 @@ use anyhow::{Result};
 pub struct MoldXConfig {
     pub moldx_dir: PathBuf,
     pub profiles_dir: PathBuf,
+    pub profiles_dir_name: String,
     pub bin_dir_name: String,
     pub template_dir_name: String,
     pub templates_dir_name: String,
@@ -44,9 +45,11 @@ impl MoldXConfig {
                 .ok_or_else(|| MoldXError2::ModulesRootResolutionFailed { path: moldx_dir.clone() })?
                 .to_path_buf()
         };
+        let profiles_dir_name_clone = profiles_dir_name.clone();
         let profiles_dir = moldx_dir.join(profiles_dir_name);
         Ok(Self {
             profiles_dir,
+            profiles_dir_name: profiles_dir_name_clone,
             moldx_dir,
             bin_dir_name,
             template_dir_name,

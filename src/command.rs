@@ -7,9 +7,9 @@ use crate::fs::{is_shell_script, resolve_name, sorted_read_dir};
 use crate::types::Entity;
 use anyhow::{Result, bail};
 
-/// Represents an executable strategy script.
+/// Represents an executable profile script.
 ///
-/// A `Command` wraps a single `.sh` file inside a strategy's bin directory.
+/// A `Command` wraps a single `.sh` file inside a profile's bin directory.
 /// The command name is derived from the file stem.
 #[derive(Debug, Clone)]
 pub struct Command {
@@ -77,8 +77,6 @@ impl Display for Command {
 
 #[cfg(test)]
 mod tests {
-    use crate::fs::validate_name;
-
 use super::*;
     use std::fs;
     use tempfile::tempdir;
@@ -111,10 +109,13 @@ use super::*;
     }
 
     #[test]
-    fn test_command_new_invalid_name_via_validate() {
-        let result = validate_name("..".into(), Entity::Command);
+    fn test_command_new_invalid_name() {
+        let dir = tempdir().unwrap();
+        let bad_path = dir.path().join("..");
+        let result = Command::new(bad_path);
         assert!(result.is_err());
-        let result = validate_name(".".into(), Entity::Command);
+        let bad_path = dir.path().join(".");
+        let result = Command::new(bad_path);
         assert!(result.is_err());
     }
 

@@ -3,6 +3,11 @@ use thiserror::Error;
 
 use crate::types::Entity;
 
+/// Errors produced by MoldX operations.
+///
+/// Every variant renders a human-readable message through its
+/// [`std::error::Error`] implementation, covering configuration, resolution,
+/// scaffolding, and process execution failures.
 #[derive(Error, Debug)]
 pub enum MoldXError2 {
     #[error("[MoldX Error] Unable to read {kind} directory: {path}.")]
@@ -34,115 +39,79 @@ pub enum MoldXError2 {
 
     #[error("[MoldX Error] Unknown entity: {entity}.")]
     UnknownEntity { entity: String },
-    
+
     #[error("[MoldX Error] Terminal must remain available during TUI run")]
     TerminalUnavailable,
 
-}
-
-/// Errors produced by MoldX operations.
-///
-/// Every variant renders a human-readable message through its
-/// [`std::error::Error`] implementation, covering configuration, resolution,
-/// scaffolding, and process execution failures.
-#[derive(Error, Debug)]
-pub enum OMoldXError {
-    #[error("unable to determine current directory")]
+    #[error("[MoldX Error] Unable to determine current directory")]
     CurrentDir,
 
-    #[error("unable to canonicalize path: {path}")]
+    #[error("[MoldX Error] Unable to canonicalize path: {path}")]
     Canonicalize { path: PathBuf },
 
-    #[error("invalid strategy directory: {path}")]
-    InvalidStrategyDir { path: PathBuf },
+    #[error("[MoldX Error] Invalid profile directory: {path}")]
+    InvalidProfileDir { path: PathBuf },
 
-    #[error("Invalid {entity} name: {name}")]
-    InvalidName { entity: Entity, name: String },
+    #[error("[MoldX Error] Profile directory has no file name: {path}")]
+    ProfileDirNoFileName { path: PathBuf },
 
-    #[error("strategy directory has no file name: {path}")]
-    StrategyDirNoFileName { path: PathBuf },
+    #[error("[MoldX Error] Profile '{name}' not available for {path}")]
+    ProfileNotAvailable { name: String, path: PathBuf },
 
-    #[error("invalid template directory: {path}")]
-    InvalidTemplateDir { path: PathBuf },
+    #[error("[MoldX Error] Command '{name}' not found in profile '{profile}'")]
+    CommandNotFoundInProfile { name: String, profile: String },
 
-    #[error("invalid strategies directory: {path}")]
-    InvalidStrategiesDir { path: PathBuf },
-
-    #[error("module directory has no file name: {path}")]
-    ModuleDirNoFileName { path: PathBuf },
-
-    #[error("unknown entity: {entity}")]
-    UnknownEntity { entity: String },
-
-    #[error("failed to spawn process: {reason}")]
-    ProcessSpawnFailed { reason: String },
-
-    #[error("failed to wait on process: {reason}")]
-    ProcessWaitFailed { reason: String },
-
-    #[error("process exited with non-zero status code: {code}")]
-    ProcessNonZeroExit { code: i32 },
-
-    #[error("terminal should remain available during TUI run")]
-    TerminalUnavailable,
-
-    #[error("path does not exist: {path}")]
-    PathNotFound { path: PathBuf },
-
-    #[error("strategy '{name}' not available for {path}")]
-    StrategyNotAvailable { name: String, path: PathBuf },
-
-    #[error("command '{name}' not found in strategy variant '{strategy}'")]
-    CommandNotFoundInStrategy { name: String, strategy: String },
-
-    #[error("command '{name}' not found for {path}")]
+    #[error("[MoldX Error] Command '{name}' not found for {path}")]
     CommandNotFound { name: String, path: PathBuf },
 
-    #[error("strategy already exists: {path}")]
-    StrategyAlreadyExists { path: PathBuf },
+    #[error("[MoldX Error] Profile already exists: {path}")]
+    ProfileAlreadyExists { path: PathBuf },
 
-    #[error("strategy not found: {name}")]
-    StrategyNotFound { name: String },
+    #[error("[MoldX Error] Profile not found: {name}")]
+    ProfileNotFound { name: String },
 
-    #[error("command already exists: {path}")]
+    #[error("[MoldX Error] Command already exists: {path}")]
     CommandAlreadyExists { path: PathBuf },
 
-    #[error("template not found for strategy {strategy}")]
-    TemplateNotFound { strategy: String },
+    #[error("[MoldX Error] Template not found for profile {profile}")]
+    TemplateNotFound { profile: String },
 
-    #[error("strategy '{name}' does not expose a scaffoldable template")]
+    #[error("[MoldX Error] Profile '{name}' does not expose a scaffoldable template")]
     NoScaffoldableTemplate { name: String },
 
-    #[error("strategy '{name}' exposes multiple templates; pick one explicitly")]
+    #[error("[MoldX Error] Profile '{name}' exposes multiple templates; pick one explicitly")]
     MultipleTemplates { name: String },
 
-    #[error("module path already exists: {path}")]
+    #[error("[MoldX Error] Module path already exists: {path}")]
     ModulePathAlreadyExists { path: PathBuf },
 
-    #[error("usage: moldx new <strategy|template|module|command> ...")]
+    #[error("[MoldX Error] Usage: moldx new <profile|module|command> ...")]
     NewUsage,
 
-    #[error("usage: moldx [strategy] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth")]
+    #[error("[MoldX Error] Usage: moldx [profile] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth")]
     RunUsage,
 
-    #[error("too many arguments; usage: moldx [strategy] <command> <path>")]
+    #[error("[MoldX Error] Too many arguments; usage: moldx [profile] <command> <path>")]
     TooManyArguments,
 
-    #[error("usage: moldx new strategy <strategy>")]
-    NewStrategyUsage,
+    #[error("[MoldX Error] Usage: moldx new profile <profile>")]
+    NewProfileUsage,
 
-    #[error("usage: moldx new template [strategy] <template>")]
-    NewTemplateUsage,
-
-    #[error("usage: moldx new command [strategy] <command>")]
+    #[error("[MoldX Error] Usage: moldx new command [profile] <command>")]
     NewCommandUsage,
 
-    #[error("usage: moldx new module [strategy] [template] <module-path>")]
+    #[error("[MoldX Error] Usage: moldx new module [profile] [template] <module-path>")]
     NewModuleUsage,
 
-    #[error("io error: {0}")]
+    #[error("[MoldX Error] Failed to wait on process: {reason}")]
+    ProcessWaitFailed { reason: String },
+
+    #[error("[MoldX Error] Process exited with non-zero status code: {code}")]
+    ProcessNonZeroExit { code: i32 },
+
+    #[error("[MoldX Error] io error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("walkdir error: {0}")]
+    #[error("[MoldX Error] walkdir error: {0}")]
     WalkDir(#[from] walkdir::Error),
 }

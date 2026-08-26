@@ -1,13 +1,13 @@
 use anyhow::Result;
 use std::fs;
 use std::fs::File;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use crate::client::MoldXClient;
 
 /// Initializes a new `.moldx` directory structure.
 ///
-/// Creates the strategies directory if missing, scaffolds a default strategy
+/// Creates the profiles directory if missing, scaffolds a default profile
 /// with empty bin and template directories, and writes a README.md unless it
 /// already exists.
 ///
@@ -23,25 +23,24 @@ use crate::client::MoldXClient;
 ///
 /// Returns an error if directories or files cannot be created.
 pub async fn init(
-    client: &MoldXClient
+    client: &MoldXClient,
 ) -> Result<()> {
     let moldx_dir: PathBuf = client.config.moldx_dir.clone();
-    let strategies_dir: PathBuf = client.config.strategies_dir.clone();
+    let profiles_dir: PathBuf = client.config.profiles_dir.clone();
     let bin_dir_name: String = client.config.bin_dir_name.clone();
-    let template_dir_name: String = client.config.bin_dir_name.clone();
+    let template_dir_name: String = client.config.template_dir_name.clone();
 
-    if !strategies_dir.exists() {
-        fs::create_dir_all(&strategies_dir)?;
-        println!("Created {}", strategies_dir.display());
+    if !profiles_dir.exists() {
+        fs::create_dir_all(&profiles_dir)?;
+        println!("Created {}", profiles_dir.display());
     } else {
-        println!("Directory already exists: {}", strategies_dir.display());
+        println!("Directory already exists: {}", profiles_dir.display());
     }
 
-    
-    let default_strategy_dir = strategies_dir.join("default");
+    let default_profile_dir = profiles_dir.join("default");
     [
-        default_strategy_dir.join(&bin_dir_name).join(".keep"),
-        default_strategy_dir.join(&template_dir_name).join(".keep"),
+        default_profile_dir.join(&bin_dir_name).join(".keep"),
+        default_profile_dir.join(&template_dir_name).join(".keep"),
     ]
         .iter()
         .try_for_each(|path| {
@@ -50,7 +49,6 @@ pub async fn init(
             Ok::<(), std::io::Error>(())
         })?;
 
-    // Write .moldx/README.md
     let readme_path = moldx_dir.join("README.md");
     if readme_path.exists() {
         println!("README.md already exists: {}", readme_path.display());
@@ -70,11 +68,12 @@ mod tests {
 
     fn make_client(dir: &std::path::Path) -> MoldXClient {
         let moldx_dir = dir.join(".moldx");
-        let strategies_dir = moldx_dir.join("strategies");
-        fs::create_dir_all(&strategies_dir).unwrap();
+        let profiles_dir = moldx_dir.join("profiles");
+        fs::create_dir_all(&profiles_dir).unwrap();
         let config = crate::config::MoldXConfig {
             moldx_dir,
-            strategies_dir,
+            profiles_dir,
+            profiles_dir_name: "profiles".into(),
             bin_dir_name: "bin".into(),
             template_dir_name: "template".into(),
             templates_dir_name: "templates".into(),
@@ -90,18 +89,18 @@ mod tests {
         let client = make_client(dir.path());
         let result = init(&client).await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/strategies/default/bin/.keep").exists());
-        assert!(dir.path().join(".moldx/strategies/default/bin/.keep").exists());
+        assert!(dir.path().join(".moldx/profiles/default/bin/.keep").exists());
+        assert!(dir.path().join(".moldx/profiles/default/template/.keep").exists());
         assert!(dir.path().join(".moldx/README.md").exists());
         let readme = fs::read_to_string(dir.path().join(".moldx/README.md")).unwrap();
         assert_eq!(readme, "# .moldx");
     }
 
     #[tokio::test]
-    async fn test_init_existing_strategies_dir() {
+    async fn test_init_existing_profiles_dir() {
         let dir = tempdir().unwrap();
         let client = make_client(dir.path());
-        fs::create_dir_all(client.config.strategies_dir.clone()).unwrap();
+        fs::create_dir_all(client.config.profiles_dir.clone()).unwrap();
         let result = init(&client).await;
         assert!(result.is_ok());
     }
@@ -118,13 +117,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_init_strategies_dir_not_existing() {
+    async fn test_init_profiles_dir_not_existing() {
         let dir = tempdir().unwrap();
         let client = make_client(dir.path());
-        let strategies_dir = client.config.strategies_dir.clone();
-        fs::remove_dir_all(&strategies_dir).unwrap();
+        let profiles_dir = client.config.profiles_dir.clone();
+        fs::remove_dir_all(&profiles_dir).unwrap();
         let result = init(&client).await;
         assert!(result.is_ok());
-        assert!(strategies_dir.exists());
+        assert!(profiles_dir.exists());
     }
 }

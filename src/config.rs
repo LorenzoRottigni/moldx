@@ -6,6 +6,10 @@ use std::fmt::{self, Display};
 use std::path::PathBuf;
 use anyhow::{Result};
 
+/// Configuration for a MoldX project.
+///
+/// Holds all directory paths and naming conventions needed to locate and
+/// resolve profiles, modules, and templates within a `.moldx` tree.
 #[derive(Debug, Clone)]
 pub struct MoldXConfig {
     pub moldx_dir: PathBuf,
@@ -19,6 +23,32 @@ pub struct MoldXConfig {
 }
 
 impl MoldXConfig {
+    /// Builds a new configuration, discovering the `.moldx` directory if it
+    /// does not exist at the given path.
+    ///
+    /// When `moldx_dir` does not exist, the filesystem is searched upward
+    /// from the current working directory for a `.moldx` directory. The
+    /// modules directory defaults to the parent of the resolved `.moldx`
+    /// directory unless an explicit path is provided.
+    ///
+    /// # Arguments
+    ///
+    /// * `moldx_dir` - Candidate path to the `.moldx` directory.
+    /// * `profiles_dir_name` - Name of the profiles subdirectory.
+    /// * `bin_dir_name` - Name of the bin subdirectory inside profiles.
+    /// * `template_dir_name` - Name of the template subdirectory inside profiles.
+    /// * `templates_dir_name` - Name of the templates subdirectory inside profiles.
+    /// * `max_resolution_depth` - Maximum upward search depth.
+    /// * `modules_dir` - Optional explicit modules root.
+    ///
+    /// # Returns
+    ///
+    /// The resolved configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `.moldx` directory cannot be found or the
+    /// modules root cannot be determined.
     pub fn new(
         moldx_dir: String,
         profiles_dir_name: String,
@@ -60,6 +90,7 @@ impl MoldXConfig {
     }
 }
 
+/// Prints the three key directory paths.
 impl Display for MoldXConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(

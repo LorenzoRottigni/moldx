@@ -11,6 +11,7 @@ use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
 use crate::constants::MOLDX_DIR_NAME;
 
+/// Subcommand handler modules.
 pub mod commands;
 
 /// Command line interface for MoldX.
@@ -91,10 +92,11 @@ impl Cli {
     ///
     /// Returns an error if the selected subcommand fails.
     pub async fn exec_with(self, client: &MoldXClient) -> Result<()> {
-        self.command.unwrap_or(Command::Ui).exec_with(&client).await
+        self.command.unwrap_or(Command::Ui).exec_with(client).await
     }
 }
 
+/// Available subcommands.
 #[derive(Subcommand)]
 pub enum Command {
     /// Launch the interactive terminal UI
@@ -125,6 +127,7 @@ pub enum Command {
     },
 }
 
+/// Dispatch logic for each variant.
 impl Command {
     async fn exec_with(self, client: &MoldXClient) -> Result<()> {
         match self {

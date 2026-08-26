@@ -24,7 +24,7 @@ use walkdir::WalkDir;
 /// accessed.
 pub fn sorted_read_dir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
     let mut entries = std::fs::read_dir(path)?.collect::<std::result::Result<Vec<_>, _>>()?;
-    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    entries.sort_by_key(|a| a.file_name());
     Ok(entries)
 }
 
@@ -84,6 +84,24 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
+/// Extracts a human-readable name from a path.
+///
+/// For directories the file name is used; for files the file stem is used.
+/// The special names `.` and `..` are rejected.
+///
+/// # Arguments
+///
+/// * `path` - The path to extract a name from.
+/// * `entity` - The entity kind, used for error context.
+///
+/// # Returns
+///
+/// The extracted name as a string.
+///
+/// # Errors
+///
+/// Returns [`MoldXError2::NameResolutionFailed`] when the name cannot be
+/// determined, or [`MoldXError2::InvalidName`] for `.` or `..`.
 pub fn resolve_name(path: &Path, entity: Entity) -> Result<String> {
     let name = if path.is_dir() {
         path.file_name()
@@ -146,10 +164,10 @@ where
                 return Ok(current);
             }
 
-            if let Ok(entries) = fs::read_dir(&current) {
-                if let Some(entry) = entries.flatten().find(|e| predicate(&e.path())) {
-                    return Ok(entry.path());
-                }
+            if let Ok(entries) = fs::read_dir(&current)
+                && let Some(entry) = entries.flatten().find(|e| predicate(&e.path()))
+            {
+                return Ok(entry.path());
             }
 
             if !current.pop() {

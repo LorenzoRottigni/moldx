@@ -19,6 +19,22 @@ pub struct Template {
 }
 
 impl Template {
+    /// Loads a template from a directory.
+    ///
+    /// Collects all non-hidden file names inside the directory. An empty
+    /// file set makes the template a catch-all that matches any directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The template directory.
+    ///
+    /// # Returns
+    ///
+    /// The loaded template.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path is not a directory.
     pub fn new(path: PathBuf) -> Result<Self> {
         if !path.is_dir() {
             bail!(MoldXError2::PathNotFound {
@@ -33,6 +49,18 @@ impl Template {
         })
     }
 
+    /// Tests whether a target directory satisfies this template.
+    ///
+    /// Returns `true` when every file name in the template is also present
+    /// in the target. An empty template always matches.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - The directory to test.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the target matches the template.
     pub fn matches(&self, target: &Path) -> bool {
         if self.file_names.is_empty() {
             return true;
@@ -45,11 +73,24 @@ impl Template {
         self.file_names.is_subset(&target_files)
     }
 
+    /// Returns whether this template is a child of the given template.
+    ///
+    /// A template is a child when its file set is a superset of the
+    /// parent's file set, meaning it matches a narrower set of directories.
+    ///
+    /// # Arguments
+    ///
+    /// * `template` - The potential parent template.
+    ///
+    /// # Returns
+    ///
+    /// `true` when this template can act as a child.
     pub fn is_child_of(&self, template: &Template) -> bool {
         template.file_names.is_subset(&self.file_names)
     }
 }
 
+/// Prints the template path and its file names.
 impl Display for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let file_names = if self.file_names.is_empty() {

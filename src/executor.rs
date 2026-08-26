@@ -11,7 +11,7 @@ use tokio::process::{Child, Command};
 
 use crate::errors::MoldXError2;
 
-type PID = u32;
+type Pid = u32;
 
 /// Status of a tracked process.
 ///
@@ -27,6 +27,7 @@ pub enum ProcessStatus {
     Killed,
 }
 
+/// Accessors for status information.
 impl ProcessStatus {
     /// Returns a plain-text label for the status.
     ///
@@ -52,6 +53,7 @@ impl ProcessStatus {
     }
 }
 
+/// Prints the status with ANSI colour codes.
 impl Display for ProcessStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -107,10 +109,11 @@ struct State {
 /// status and output can be inspected from other tasks.
 #[derive(Debug)]
 pub struct Executor {
-    processes: HashMap<PID, Child>,
+    processes: HashMap<Pid, Child>,
     state: Arc<Mutex<State>>,
 }
 
+/// Clones the shared state handle without copying child processes.
 impl Clone for Executor {
     fn clone(&self) -> Self {
         Self {
@@ -120,6 +123,13 @@ impl Clone for Executor {
     }
 }
 
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Process execution and state management.
 impl Executor {
     /// Creates a new executor with no tracked processes.
     ///
@@ -370,10 +380,11 @@ impl Executor {
     }
 }
 
+/// Prints the executor summary with running-process details.
 impl Display for Executor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let g = self.state.lock().map_err(|_| fmt::Error)?;
-        writeln!(f, "{} {}", "executor:".bold().yellow(), format!("{} running", g.processes.len()))?;
+        writeln!(f, "{} {} running", "executor:".bold().yellow(), g.processes.len())?;
         for process in &g.processes {
             writeln!(
                 f,

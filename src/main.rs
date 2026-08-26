@@ -7,18 +7,31 @@
 use anyhow::Result;
 use clap::Parser;
 
+/// Command line argument parsing and subcommand dispatch.
 pub mod cli;
+/// Client facade that ties together profiles, modules, and execution.
 pub mod client;
+/// Executable scripts that live inside a profile's bin directory.
 pub mod command;
+/// Configuration resolution for a `.moldx` project tree.
 pub mod config;
+/// Default directory and file names used by MoldX.
 pub mod constants;
+/// Error types raised by MoldX operations.
 pub mod errors;
+/// Process spawning, tracking, and lifecycle management.
 pub mod executor;
+/// Filesystem helpers for reading directories and discovering paths.
 pub mod fs;
+/// A directory on the filesystem that matches one or more profiles.
 pub mod module;
+/// A named collection of templates, commands, and nested profiles.
 pub mod profile;
+/// Template files used to identify and scaffold modules.
 pub mod template;
+/// Interactive terminal UI built with ratatui.
 pub mod tui;
+/// Shared type definitions (e.g. [`Entity`]).
 pub mod types;
 
 /// Runs the MoldX command line application.
@@ -40,7 +53,7 @@ async fn main() -> Result<()> {
         cli.bin_dir_name.clone(),
         cli.template_dir_name.clone(),
         cli.templates_dir_name.clone(),
-        cli.max_resolution_depth.clone(),
+        cli.max_resolution_depth,
         cli.modules_dir.clone(),
     )?;
     let client = client::MoldXClient::new(config)?;

@@ -8,6 +8,10 @@ use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use walkdir::WalkDir;
 
+/// Main facade for interacting with a MoldX project.
+///
+/// A `MoldXClient` loads profiles, discovers modules, and provides
+/// commands for executing profile scripts against modules.
 #[derive(Debug)]
 pub struct MoldXClient {
     pub profiles: Vec<Profile>,
@@ -17,6 +21,19 @@ pub struct MoldXClient {
 }
 
 impl MoldXClient {
+    /// Builds a new client by loading profiles and discovering modules.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The resolved MoldX configuration.
+    ///
+    /// # Returns
+    ///
+    /// A fully initialized client ready for use.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if profiles or modules cannot be loaded.
     pub fn new(config: MoldXConfig) -> Result<Self> {
         let mut client = Self {
             profiles: Profile::resolve_profiles(&config.profiles_dir, &config)?,
@@ -28,6 +45,18 @@ impl MoldXClient {
         Ok(client)
     }
 
+    /// Walks the modules directory and populates `self.modules`.
+    ///
+    /// Only directories that match at least one profile's template are
+    /// kept. Directories inside the `.moldx` tree are skipped.
+    ///
+    /// # Returns
+    ///
+    /// Ok once the module list has been refreshed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory tree cannot be traversed.
     pub fn load_modules(&mut self) -> Result<()> {
         let moldx_dir = self
             .config
@@ -56,10 +85,10 @@ impl MoldXClient {
                 continue;
             }
 
-            if let Ok(module) = Module::resolve(path, &self.profiles) {
-                if !module.profiles.is_empty() {
-                    self.modules.push(module);
-                }
+            if let Ok(module) = Module::resolve(path, &self.profiles)
+                && !module.profiles.is_empty()
+            {
+                self.modules.push(module);
             }
         }
 
@@ -68,6 +97,19 @@ impl MoldXClient {
         Ok(())
     }
 
+    /// Walks the modules directory and returns matched modules without
+    /// mutating the client.
+    ///
+    /// Behaves identically to [`load_modules`] but returns the result
+    /// instead of storing it.
+    ///
+    /// # Returns
+    ///
+    /// The list of discovered modules, sorted by path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory tree cannot be traversed.
     pub fn resolve_modules(&self) -> Result<Vec<Module>> {
         let moldx_dir = self
             .config
@@ -95,10 +137,10 @@ impl MoldXClient {
                 continue;
             }
 
-            if let Ok(module) = Module::resolve(path, &self.profiles) {
-                if !module.profiles.is_empty() {
-                    modules.push(module);
-                }
+            if let Ok(module) = Module::resolve(path, &self.profiles)
+                && !module.profiles.is_empty()
+            {
+                modules.push(module);
             }
         }
 
@@ -107,6 +149,15 @@ impl MoldXClient {
         Ok(modules)
     }
 
+    /// Returns all profiles whose templates match the given module path.
+    ///
+    /// # Arguments
+    ///
+    /// * `module_path` - The path to test against profile templates.
+    ///
+    /// # Returns
+    ///
+    /// References to the matching profiles.
     pub fn profiles_for_module(&self, module_path: &std::path::Path) -> Vec<&Profile> {
         self.profiles
             .iter()
@@ -114,12 +165,18 @@ impl MoldXClient {
             .collect()
     }
 
+    /// Placeholder for future command-handler dispatch logic.
+    ///
+    /// # Returns
+    ///
+    /// Always returns `Ok(())`.
     pub fn exec() -> Result<()> {
         // find a way to associate handler mod resolution with enum values
         Ok(())
     }
 }
 
+/// Prints the configuration, executor status, profiles, and modules.
 impl Display for MoldXClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{}", self.config)?;

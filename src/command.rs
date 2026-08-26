@@ -19,6 +19,23 @@ pub struct Command {
 }
 
 impl Command {
+    /// Loads a command from a shell script file.
+    ///
+    /// The command name is derived from the file stem and the format from
+    /// the file extension.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the `.sh` script.
+    ///
+    /// # Returns
+    ///
+    /// The loaded command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path is not a file, is not a shell script,
+    /// or its name cannot be resolved.
     pub fn new(path: PathBuf) -> Result<Self> {
         if !path.is_file() {
             bail!(MoldXError2::PathNotFound {
@@ -46,6 +63,22 @@ impl Command {
         })
     }
 
+    /// Discovers and loads all commands in a directory.
+    ///
+    /// Only files are considered; subdirectories are ignored.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - The directory to scan for command scripts.
+    ///
+    /// # Returns
+    ///
+    /// The list of resolved commands, sorted by file name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory does not exist or a script cannot
+    /// be loaded.
     pub fn resolve_commands(source: &Path) -> Result<Vec<Command>> {
         if !source.is_dir() {
             bail!(MoldXError2::PathNotFound {
@@ -62,6 +95,7 @@ impl Command {
     }
 }
 
+/// Prints the command name, file extension, and path.
 impl Display for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

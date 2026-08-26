@@ -8,6 +8,11 @@ use crate::fs::resolve_name;
 use crate::profile::Profile;
 use crate::types::Entity;
 
+/// A directory on the filesystem that matches one or more profiles.
+///
+/// A `Module` is any subdirectory of the modules root whose file names
+/// satisfy at least one profile's template. The `profiles` field stores
+/// indices into the resolved profile list.
 #[derive(Clone, Debug)]
 pub struct Module {
     pub name: String,
@@ -16,6 +21,21 @@ pub struct Module {
 }
 
 impl Module {
+    /// Creates a module with an explicit set of matching profile indices.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The module directory.
+    /// * `profiles` - Indices of profiles whose templates match.
+    ///
+    /// # Returns
+    ///
+    /// The new module.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path is not a directory or its name cannot
+    /// be resolved.
     pub fn new(path: PathBuf, profiles: Vec<usize>) -> Result<Self> {
         if !path.is_dir() {
             bail!(MoldXError2::PathNotFound {
@@ -30,6 +50,24 @@ impl Module {
         })
     }
 
+    /// Resolves a module by matching its directory against all known profiles.
+    ///
+    /// Only profiles whose templates match the directory's file names are
+    /// included in the returned module.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The module directory.
+    /// * `profiles` - The full list of resolved profiles.
+    ///
+    /// # Returns
+    ///
+    /// The resolved module with its matching profile indices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the path is not a directory or its name cannot
+    /// be resolved.
     pub fn resolve(path: PathBuf, profiles: &[Profile]) -> Result<Self> {
         if !path.is_dir() {
             bail!(MoldXError2::PathNotFound {
@@ -55,6 +93,7 @@ impl Module {
     }
 }
 
+/// Prints the module name, matching profile count, and path.
 impl Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let profile_count = self.profiles.len();

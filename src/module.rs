@@ -1,71 +1,75 @@
 use std::path::PathBuf;
 use std::fmt::{self, Display};
 use owo_colors::OwoColorize;
-use anyhow::Result;
+use anyhow::{Result, bail};
 
-use crate::errors::MoldXError;
-use crate::fs::validate_name;
+use crate::errors::{MoldXError2};
+use crate::fs::resolve_name;
+use crate::profile::Profile;
 use crate::types::Entity;
 
-/// Represents a discovered project module.
-///
-/// A module is a directory matched by at least one non-agnostic strategy.
-/// Matching strategies are stored as indices into the client's strategy
-/// list.
 #[derive(Clone, Debug)]
 pub struct Module {
     pub name: String,
-    pub dir: PathBuf,
-    pub strategies: Vec<usize>,
+    pub path: PathBuf,
+    pub profiles: Vec<usize>,
 }
 
 impl Module {
-    /// Creates a new module from the given directory.
-    ///
-    /// # Arguments
-    ///
-    /// * `dir` - The module directory.
-    /// * `strategies` - Indices of the strategies matching the module.
-    ///
-    /// # Returns
-    ///
-    /// A fully initialized [`Module`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MoldXError::ModuleDirNoFileName`] if the directory has no
-    /// file name, and [`MoldXError::InvalidName`] if the derived name is not
-    /// valid.
-    pub fn new(dir: PathBuf, strategies: Vec<usize>) -> Result<Self> {
-        let name = dir
-            .file_name()
-            .ok_or_else(|| MoldXError::ModuleDirNoFileName { path: dir.clone() })?
-            .to_string_lossy()
-            .into_owned();
-        validate_name(name.clone(), Entity::Module)?;
+    pub fn new(path: PathBuf, profiles: Vec<usize>) -> Result<Self> {
+        if !path.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: path.to_path_buf(),
+                kind: "module",
+            });
+        }
+        Ok(Self {
+            name: resolve_name(&path, Entity::Module)?,
+            path,
+            profiles
+        })
+    }
+
+    pub fn resolve(path: PathBuf, profiles: &[Profile]) -> Result<Self> {
+        if !path.is_dir() {
+            bail!(MoldXError2::PathNotFound {
+                path: path.clone(),
+                kind: "module",
+            });
+        }
+
+        let name = resolve_name(&path, Entity::Module)?;
+
+        let matching_profiles = profiles
+            .iter()
+            .enumerate()
+            .filter(|(_, profile)| profile.template.matches(&path))
+            .map(|(index, _)| index)
+            .collect();
+
         Ok(Self {
             name,
-            dir,
-            strategies
+            path,
+            profiles: matching_profiles,
         })
     }
 }
 
 impl Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let strategy_count = self.strategies.len();
-        let strategy_label = match strategy_count {
-            0 => "no strategies".dimmed().to_string(),
-            1 => "1 strategy".cyan().to_string(),
-            n => format!("{} strategies", n).cyan().to_string(),
+        let profile_count = self.profiles.len();
+        let profile_label = match profile_count {
+            0 => "no profiles".dimmed().to_string(),
+            1 => "1 profile".cyan().to_string(),
+            n => format!("{} profiles", n).cyan().to_string(),
         };
 
         write!(
             f,
             "{} [{}] {}",
             self.name.bold().green(),
-            strategy_label,
-            format!("@ {}", self.dir.display()).dimmed()
+            profile_label,
+            format!("@ {}", self.path.display()).dimmed()
         )
     }
 }
@@ -83,8 +87,8 @@ mod tests {
         fs::create_dir(&module_dir).unwrap();
         let m = Module::new(module_dir.clone(), vec![0, 2]).unwrap();
         assert_eq!(m.name, "my-module");
-        assert_eq!(m.dir, module_dir);
-        assert_eq!(m.strategies, vec![0, 2]);
+        assert_eq!(m.path, module_dir);
+        assert_eq!(m.profiles, vec![0, 2]);
     }
 
     #[test]
@@ -94,34 +98,26 @@ mod tests {
     }
 
     #[test]
-    fn test_module_new_invalid_name_via_validate() {
-        let result = validate_name("..".into(), Entity::Module);
-        assert!(result.is_err());
-        let result = validate_name(".".into(), Entity::Module);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_module_display_zero_strategies() {
+    fn test_module_display_zero_profiles() {
         let dir = tempdir().unwrap();
         let m = Module::new(dir.path().to_path_buf(), vec![]).unwrap();
         let display = m.to_string();
-        assert!(display.contains("no strategies"));
+        assert!(display.contains("no profiles"));
     }
 
     #[test]
-    fn test_module_display_one_strategy() {
+    fn test_module_display_one_profile() {
         let dir = tempdir().unwrap();
         let m = Module::new(dir.path().to_path_buf(), vec![0]).unwrap();
         let display = m.to_string();
-        assert!(display.contains("1 strategy"));
+        assert!(display.contains("1 profile"));
     }
 
     #[test]
-    fn test_module_display_multiple_strategies() {
+    fn test_module_display_multiple_profiles() {
         let dir = tempdir().unwrap();
         let m = Module::new(dir.path().to_path_buf(), vec![0, 1, 2]).unwrap();
         let display = m.to_string();
-        assert!(display.contains("3 strategies"));
+        assert!(display.contains("3 profiles"));
     }
 }

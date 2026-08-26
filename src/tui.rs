@@ -47,7 +47,7 @@ use tokio::sync::oneshot;
 use crate::{
     client::MoldXClient,
     command::Command,
-    errors::MoldXError,
+    errors::MoldXError2,
     executor::{self, Executor},
     module::Module,
 };
@@ -766,7 +766,7 @@ pub async fn run(client: &MoldXClient) -> Result<()> {
         {
             let terminal = session
                 .terminal_mut()
-                .ok_or(MoldXError::TerminalUnavailable)?;
+                .ok_or(MoldXError2::TerminalUnavailable)?;
             terminal.draw(|f| draw(f, &mut app))?;
         }
 

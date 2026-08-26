@@ -1,5 +1,5 @@
 use crate::errors::MoldXError2;
-use crate::{errors::MoldXError, types::Entity};
+use crate::types::Entity;
 use anyhow::{bail, Result};
 use std::fs;
 use std::{
@@ -26,22 +26,6 @@ pub fn sorted_read_dir(path: &Path) -> Result<Vec<std::fs::DirEntry>> {
     let mut entries = std::fs::read_dir(path)?.collect::<std::result::Result<Vec<_>, _>>()?;
     entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
     Ok(entries)
-}
-
-/// Returns whether a directory name should be skipped during discovery.
-///
-/// Hidden names (starting with `.`) as well as `target` and `node_modules`
-/// are considered ignored.
-///
-/// # Arguments
-///
-/// * `name` - The file name to test.
-///
-/// # Returns
-///
-/// `true` if the name should be ignored.
-pub fn is_ignored_name(name: &str) -> bool {
-    name.starts_with('.') || name == "target" || name == "node_modules"
 }
 
 /// Returns whether a path refers to a shell script.
@@ -100,31 +84,6 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
-/// Validates the name of a MoldX entity.
-///
-/// Names must not contain path separators and must not be `.` or `..`.
-///
-/// # Arguments
-///
-/// * `name` - The name to validate.
-/// * `entity` - The entity kind the name belongs to, used for error
-///   reporting.
-///
-/// # Returns
-///
-/// `Ok(())` if the name is valid.
-///
-/// # Errors
-///
-/// Returns [`MoldXError::InvalidName`] if the name contains a path separator
-/// or is `.` or `..`.
-pub fn validate_name(name: String, entity: Entity) -> Result<()> {
-    if name.contains('/') || name.contains('\\') || name == "." || name == ".." {
-        bail!(MoldXError2::InvalidName { name, entity });
-    }
-    Ok(())
-}
-
 pub fn resolve_name(path: &Path, entity: Entity) -> Result<String> {
     let name = if path.is_dir() {
         path.file_name()
@@ -147,13 +106,6 @@ pub fn resolve_name(path: &Path, entity: Entity) -> Result<String> {
     Ok(name)
 }
 
-pub fn validate_dir(dir: &PathBuf) -> Result<bool> {
-    if !dir.exists() || !dir.is_dir() {
-        return Err(MoldXError::InvalidStrategyDir { path: dir.clone() }.into());
-    }
-    Ok(true)
-}
-
 /// Searches the filesystem for the first path satisfying a predicate.
 ///
 /// When `traverse_upward` is set, the search starts at `start` and walks up
@@ -174,13 +126,13 @@ pub fn validate_dir(dir: &PathBuf) -> Result<bool> {
 ///
 /// # Errors
 ///
-/// Returns [`MoldXError::PathNotFound`] if no path satisfies the predicate.
+/// Returns [`MoldXError2::PathNotFound`] if no path satisfies the predicate.
 pub fn discover_path<F>(
     start: impl Into<PathBuf>,
     predicate: F,
     max_depth: usize,
     traverse_upward: bool,
-) -> Result<PathBuf, MoldXError>
+) -> Result<PathBuf>
 where
     F: Fn(&Path) -> bool,
 {
@@ -216,7 +168,7 @@ where
         }
     }
 
-    Err(MoldXError::PathNotFound { path: start })
+    bail!(MoldXError2::DiscoveryFailed { start, kind: ".moldx" })
 }
 
 #[cfg(test)]
@@ -251,16 +203,6 @@ mod tests {
     fn test_sorted_read_dir_nonexistent() {
         let result = sorted_read_dir(Path::new("/nonexistent_path_12345"));
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_is_ignored_name() {
-        assert!(is_ignored_name(".git"));
-        assert!(is_ignored_name(".hidden"));
-        assert!(is_ignored_name("target"));
-        assert!(is_ignored_name("node_modules"));
-        assert!(!is_ignored_name("src"));
-        assert!(!is_ignored_name("lib"));
     }
 
     #[test]
@@ -302,32 +244,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let names = file_names_for_dir(dir.path()).unwrap();
         assert!(names.is_empty());
-    }
-
-    #[test]
-    fn test_validate_name_valid() {
-        assert!(validate_name("my-strategy".into(), Entity::Strategy).is_ok());
-        assert!(validate_name("build".into(), Entity::Command).is_ok());
-    }
-
-    #[test]
-    fn test_validate_name_invalid_slash() {
-        assert!(validate_name("bad/name".into(), Entity::Strategy).is_err());
-    }
-
-    #[test]
-    fn test_validate_name_invalid_backslash() {
-        assert!(validate_name("bad\\name".into(), Entity::Module).is_err());
-    }
-
-    #[test]
-    fn test_validate_name_invalid_dot() {
-        assert!(validate_name(".".into(), Entity::Template).is_err());
-    }
-
-    #[test]
-    fn test_validate_name_invalid_dotdot() {
-        assert!(validate_name("..".into(), Entity::Command).is_err());
     }
 
     #[test]

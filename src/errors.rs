@@ -5,20 +5,39 @@ use crate::types::Entity;
 
 #[derive(Error, Debug)]
 pub enum MoldXError2 {
-    #[error("[MoldX Error]: Unable to read {kind} dir: {path}")]
+    #[error("[MoldX Error] Unable to read {kind} directory: {path}.")]
     PathNotFound { path: PathBuf, kind: &'static str },
 
-    #[error("[MoldX Error]: Unable to determine {entity} name from: {path}")]
+    #[error("[MoldX Error] Unable to determine {entity} name from: {path}.")]
     NameResolutionFailed { path: PathBuf, entity: Entity },
 
-    #[error("[MoldX Error]: Invalid {entity} name: {name}")]
+    #[error("[MoldX Error] Invalid {entity} name: {name}.")]
     InvalidName { entity: Entity, name: String },
 
-    #[error("[MoldX Error]: Parent profile {parent} template must be a subset of child profile template: {child}")]
+    #[error("[MoldX Error] Parent profile {parent} template must be a subset of child profile template: {child}.")]
     UnmatchedChildProfile { parent: PathBuf, child: PathBuf },
 
-    #[error("[MoldX Error]: Command must be a shell script: {path}")]
-    InvalidCommandFormat { path: PathBuf }
+    #[error("[MoldX Error] Command must be a shell script: {path}.")]
+    InvalidCommandFormat { path: PathBuf },
+
+    #[error("[MoldX Error] Unable to retrieve CWD.")]
+    CwdNotFound,
+
+    #[error("[MoldX Error] Unable to resolve the modules root directory as parent of: {path}")]
+    ModulesRootResolutionFailed { path: PathBuf },
+
+    #[error("[MoldX Error] Unable to spawn process: {reason}")]
+    ProcessSpawnFailed { reason: String },
+
+    #[error("[MoldX Error] Path discovery for {kind} failed starting from {start}.")]
+    DiscoveryFailed { start: PathBuf, kind: &'static str },
+
+    #[error("[MoldX Error] Unknown entity: {entity}.")]
+    UnknownEntity { entity: String },
+    
+    #[error("[MoldX Error] Terminal must remain available during TUI run")]
+    TerminalUnavailable,
+
 }
 
 /// Errors produced by MoldX operations.
@@ -27,7 +46,7 @@ pub enum MoldXError2 {
 /// [`std::error::Error`] implementation, covering configuration, resolution,
 /// scaffolding, and process execution failures.
 #[derive(Error, Debug)]
-pub enum MoldXError {
+pub enum OMoldXError {
     #[error("unable to determine current directory")]
     CurrentDir,
 
@@ -126,100 +145,4 @@ pub enum MoldXError {
 
     #[error("walkdir error: {0}")]
     WalkDir(#[from] walkdir::Error),
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_error_display_all_variants() {
-        let errors: Vec<String> = vec![
-            MoldXError::CurrentDir.to_string(),
-            MoldXError::Canonicalize {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::InvalidStrategyDir {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::InvalidName {
-                entity: Entity::Strategy,
-                name: "bad".into(),
-            }
-            .to_string(),
-            MoldXError::StrategyDirNoFileName {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::InvalidTemplateDir {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::InvalidStrategiesDir {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::ModuleDirNoFileName {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::UnknownEntity { entity: "x".into() }.to_string(),
-            MoldXError::ProcessSpawnFailed { reason: "r".into() }.to_string(),
-            MoldXError::ProcessWaitFailed { reason: "r".into() }.to_string(),
-            MoldXError::ProcessNonZeroExit { code: 1 }.to_string(),
-            MoldXError::TerminalUnavailable.to_string(),
-            MoldXError::PathNotFound {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::StrategyNotAvailable {
-                name: "s".into(),
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::CommandNotFoundInStrategy {
-                name: "c".into(),
-                strategy: "s".into(),
-            }
-            .to_string(),
-            MoldXError::CommandNotFound {
-                name: "c".into(),
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::StrategyAlreadyExists {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::StrategyNotFound { name: "s".into() }.to_string(),
-            MoldXError::CommandAlreadyExists {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::TemplateNotFound {
-                name: "t".into(),
-                strategy: "s".into(),
-            }
-            .to_string(),
-            MoldXError::NoScaffoldableTemplate { name: "s".into() }.to_string(),
-            MoldXError::MultipleTemplates { name: "s".into() }.to_string(),
-            MoldXError::ModulePathAlreadyExists {
-                path: PathBuf::from("/p"),
-            }
-            .to_string(),
-            MoldXError::NewUsage.to_string(),
-            MoldXError::RunUsage.to_string(),
-            MoldXError::TooManyArguments.to_string(),
-            MoldXError::NewStrategyUsage.to_string(),
-            MoldXError::NewTemplateUsage.to_string(),
-            MoldXError::NewCommandUsage.to_string(),
-            MoldXError::NewModuleUsage.to_string(),
-        ];
-        for msg in errors {
-            assert!(!msg.is_empty());
-        }
-    }
 }

@@ -25,7 +25,7 @@ impl Profile {
         let name = resolve_name(path, Entity::Profile)?;
         let template = Template::new(path.join(&config.template_dir_name))?;
         let commands = Command::resolve_commands(&path.join(&config.bin_dir_name))?;
-        let profiles = Self::resolve_profiles(&path.join("profiles"), config)?;
+        let profiles = Self::resolve_profiles(&path.join(&config.profiles_dir), config)?;
 
         let profile = Self {
             name,

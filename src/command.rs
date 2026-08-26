@@ -2,8 +2,8 @@ use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
-use crate::errors::{MoldXError, MoldXError2};
-use crate::fs::{is_shell_script, resolve_name, sorted_read_dir, validate_dir, validate_name};
+use crate::errors::{MoldXError2};
+use crate::fs::{is_shell_script, resolve_name, sorted_read_dir};
 use crate::types::Entity;
 use anyhow::{Result, bail};
 
@@ -77,7 +77,9 @@ impl Display for Command {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::fs::validate_name;
+
+use super::*;
     use std::fs;
     use tempfile::tempdir;
 

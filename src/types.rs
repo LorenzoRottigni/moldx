@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::fmt;
-
-use crate::errors::MoldXError;
+use anyhow::Result;
+use crate::errors::MoldXError2;
 
 /// The kinds of entities managed by MoldX.
 ///
@@ -37,7 +37,7 @@ impl Entity {
 }
 
 impl FromStr for Entity {
-    type Err = MoldXError;
+    type Err = MoldXError2;
 
     /// Parses an entity name into an [`Entity`].
     ///
@@ -51,7 +51,7 @@ impl FromStr for Entity {
     ///
     /// # Errors
     ///
-    /// Returns [`MoldXError::UnknownEntity`] if the value does not name a
+    /// Returns [`MoldXError2::UnknownEntity`] if the value does not name a
     /// known entity.
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
@@ -59,7 +59,7 @@ impl FromStr for Entity {
             "template" => Ok(Entity::Template),
             "module" => Ok(Entity::Module),
             "command" => Ok(Entity::Command),
-            _ => Err(MoldXError::UnknownEntity { entity: value.to_string() }),
+            _ => Err(MoldXError2::UnknownEntity { entity: value.to_string() }),
         }
     }
 }

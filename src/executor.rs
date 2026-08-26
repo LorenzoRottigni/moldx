@@ -9,7 +9,7 @@ use std::{
 };
 use tokio::process::{Child, Command};
 
-use crate::errors::MoldXError;
+use crate::errors::MoldXError2;
 
 type PID = u32;
 
@@ -153,7 +153,7 @@ impl Executor {
     ///
     /// # Errors
     ///
-    /// Returns [`MoldXError::ProcessSpawnFailed`] if the process cannot be
+    /// Returns [`MoldXError2::ProcessSpawnFailed`] if the process cannot be
     /// spawned or its PID cannot be determined.
     pub async fn exec(
         &mut self,
@@ -164,9 +164,9 @@ impl Executor {
             .arg(script)
             .arg(module_path)
             .spawn()
-            .map_err(|e| MoldXError::ProcessSpawnFailed { reason: e.to_string() })?;
+            .map_err(|e| MoldXError2::ProcessSpawnFailed { reason: e.to_string() })?;
 
-        let pid = child.id().ok_or_else(|| MoldXError::ProcessSpawnFailed { reason: "failed to get process ID".to_string() })?;
+        let pid = child.id().ok_or_else(|| MoldXError2::ProcessSpawnFailed { reason: "failed to get process ID".to_string() })?;
         self.processes.insert(pid, child);
         Ok(pid)
     }

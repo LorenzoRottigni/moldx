@@ -1,4 +1,4 @@
-use crate::config::MoldXConfig;
+use crate::{command::Command, config::MoldXConfig};
 use crate::executor::Executor;
 use crate::module::Module;
 use crate::profile::Profile;
@@ -6,6 +6,7 @@ use crate::profile::Profile;
 use anyhow::Result;
 use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
+use std::path::Path;
 use walkdir::WalkDir;
 
 /// Main facade for interacting with a MoldX project.
@@ -163,6 +164,21 @@ impl MoldXClient {
             .iter()
             .filter(|p| p.template.matches(module_path))
             .collect()
+    }
+
+    pub fn commands_for_module(
+        &self,
+        command_name: &str,
+        module_path: &Path,
+        profile_names: &[String],
+    ) -> Vec<Command> {
+        let mut discovered = Vec::new();
+
+        self.profiles.iter().for_each(|p| {
+            p.commands_for_module(command_name, module_path, &mut discovered, profile_names);
+        });
+
+        discovered
     }
 
     /// Placeholder for future command-handler dispatch logic.

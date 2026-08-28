@@ -13,6 +13,7 @@ use crate::constants::MOLDX_DIR_NAME;
 
 /// Subcommand handler modules.
 pub mod commands;
+mod args;
 
 /// Command line interface for MoldX.
 ///
@@ -130,13 +131,27 @@ pub enum Command {
 /// Dispatch logic for each variant.
 impl Command {
     async fn exec_with(self, client: &MoldXClient) -> Result<()> {
+        // commands/run.rs => pub RunCommandArgs(Vec<String>) -> Self
+        // args.rs => MoldXCommandArgs(Vec<String>) -> Self
+
+
+        // parse command args from Vec<String> to a typed struct
+        // autoresolve or stdin required args from typed struct
+        // provide typed struct to command handler
+
+
+        // MoldXCommandArgs.resolve(self) -> 
+  
         match self {
             Self::Ui => commands::ui::ui(client).await,
             Self::Detect { path } => commands::detect::detect(client, path).await,
             Self::List => commands::list::list(client).await,
             Self::Init => commands::init::init(client).await,
             Self::New { args } => commands::new::new(client, args).await,
-            Self::Run(args) => commands::run::run(client, args).await,
+            Self::Run(args) => {
+                let args = commands::run::RunCommandArgs::parse_with(args, client).await?;
+                commands::run::run(client, args).await
+            }
         }
     }
 }

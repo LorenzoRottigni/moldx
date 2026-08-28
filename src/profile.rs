@@ -96,6 +96,42 @@ impl Profile {
             .collect()
     }
 
+    /// Recursively discovers commands matching a module and optional profile
+    /// hierarchy.
+    ///
+    /// Profile names are resolved from top to bottom. When `profile_names` is
+    /// empty, all profiles are traversed at the current level. Otherwise, only
+    /// the profile matching the first name is traversed, with the remaining names
+    /// passed recursively to child profiles.
+    ///
+    /// A command is added to `discovered` when the current profile matches the
+    /// requested hierarchy and exposes the requested command.
+    pub fn commands_for_module(
+        &self,
+        command_name: &str,
+        module_path: &Path,
+        discovered: &mut Vec<Command>,
+        profile_names: &[String],
+    ) {
+        if profile_names.first().is_none_or(|n| self.name == *n)
+            && let Some(command) = self.get_local_command(&command_name.to_string())
+        {
+            discovered.push(command);
+        }
+
+        self.profiles
+            .iter()
+            .filter(|p| profile_names.first().is_none_or(|n| p.name == *n))
+            .for_each(|p| {
+                p.commands_for_module(
+                    command_name,
+                    module_path,
+                    discovered,
+                    profile_names.get(1..).unwrap_or_default(),
+                );
+            });
+    }
+
     /// Looks up a command by name in this profile only.
     ///
     /// # Arguments

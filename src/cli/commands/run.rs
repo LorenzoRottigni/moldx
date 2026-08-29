@@ -57,7 +57,8 @@ impl FromCommandArgs for RunCommandArgs {
 /// apply to the path, [`MoldXError2::CommandNotFoundInProfile`] or
 /// [`MoldXError2::CommandNotFound`] if the command is unknown, and any
 /// error raised while executing the script.
-pub async fn run(client: &MoldXClient, args: RunCommandArgs) -> Result<()> {
+pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
+    let args = RunCommandArgs::from_command_args(args)?;
     let commands =
         client.commands_for_module(&args.command, &args.path.to_path_buf(), &args.profiles);
 
@@ -78,50 +79,9 @@ pub async fn run(client: &MoldXClient, args: RunCommandArgs) -> Result<()> {
         .exec_blocking(&command.path, &args.path)
         .await?;
 
-    /*let path = args
-        .path
-        .expect("RunCommandArgs must be resolved before execution");
-
-    if !path.exists() {
-        return Err(MoldXError2::PathNotFound {
-            path,
-            kind: "module",
-        }
-        .into());
-    }
-
-    let available_profiles = client.profiles_for_module(&path);
-
-    let command = if let Some(profile_name) = args.profile {
-        let profile = available_profiles
-            .iter()
-            .find(|candidate| candidate.name == profile_name)
-            .ok_or_else(|| MoldXError2::ProfileNotAvailable {
-                name: profile_name,
-                path: path.clone(),
-            })?;
-
-        profile
-            .get_command(&args.command)
-            .ok_or_else(|| MoldXError2::CommandNotFoundInProfile {
-                name: args.command,
-                profile: profile.name.clone(),
-            })?
-    } else {
-        available_profiles
-            .iter()
-            .find_map(|profile| profile.get_command(&args.command))
-            .ok_or_else(|| MoldXError2::CommandNotFound {
-                name: args.command,
-                path: path.clone(),
-            })?
-    };
-
-    let code = client.executor.exec_blocking(&command.path, &path).await?;
-
     if code != 0 {
         std::process::exit(code);
-    } */
+    }
 
     Ok(())
 }

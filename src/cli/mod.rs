@@ -3,7 +3,6 @@ use clap::Parser;
 use clap::Subcommand;
 use std::path::PathBuf;
 
-use crate::cli::args::FromCommandArgs;
 use crate::client::MoldXClient;
 use crate::constants::DEFAULT_BIN_DIR_NAME;
 use crate::constants::DEFAULT_MAX_RESOLUTION_DEPTH;
@@ -147,10 +146,7 @@ impl Command {
             Self::List => commands::list::list(client).await,
             Self::Init => commands::init::init(client).await,
             Self::New { args } => commands::new::new(client, args).await,
-            Self::Run(args) => {
-                use commands::run::{run, RunCommandArgs};
-                run(client, RunCommandArgs::from_command_args(args)?).await
-            }
+            Self::Run(args) => commands::run::run(client, args).await,
         }
     }
 }

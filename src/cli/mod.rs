@@ -3,6 +3,7 @@ use clap::Parser;
 use clap::Subcommand;
 use std::path::PathBuf;
 
+use crate::cli::args::FromCommandArgs;
 use crate::client::MoldXClient;
 use crate::constants::DEFAULT_BIN_DIR_NAME;
 use crate::constants::DEFAULT_MAX_RESOLUTION_DEPTH;
@@ -11,9 +12,9 @@ use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
 use crate::constants::MOLDX_DIR_NAME;
 
+mod args;
 /// Subcommand handler modules.
 pub mod commands;
-mod args;
 
 /// Command line interface for MoldX.
 ///
@@ -134,14 +135,12 @@ impl Command {
         // commands/run.rs => pub RunCommandArgs(Vec<String>) -> Self
         // args.rs => MoldXCommandArgs(Vec<String>) -> Self
 
-
         // parse command args from Vec<String> to a typed struct
         // autoresolve or stdin required args from typed struct
         // provide typed struct to command handler
 
+        // MoldXCommandArgs.resolve(self) ->
 
-        // MoldXCommandArgs.resolve(self) -> 
-  
         match self {
             Self::Ui => commands::ui::ui(client).await,
             Self::Detect { path } => commands::detect::detect(client, path).await,
@@ -149,8 +148,8 @@ impl Command {
             Self::Init => commands::init::init(client).await,
             Self::New { args } => commands::new::new(client, args).await,
             Self::Run(args) => {
-                let args = commands::run::RunCommandArgs::parse_with(args, client).await?;
-                commands::run::run(client, args).await
+                use commands::run::{run, RunCommandArgs};
+                run(client, RunCommandArgs::from_command_args(args)?).await
             }
         }
     }

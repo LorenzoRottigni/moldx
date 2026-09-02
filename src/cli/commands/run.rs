@@ -1,5 +1,6 @@
 use anyhow::Result;
 use dialoguer::Select;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use crate::{cli::args::FromCommandArgs, client::MoldXClient};
@@ -57,19 +58,62 @@ impl FromCommandArgs for RunCommandArgs {
 /// apply to the path, [`MoldXError2::CommandNotFoundInProfile`] or
 /// [`MoldXError2::CommandNotFound`] if the command is unknown, and any
 /// error raised while executing the script.
-pub async fn run(client: &MoldXClient, args: Vec<String>) -> Result<()> {
+pub async fn run(client: &MoldXClient, args: Vec<String>, skip_conflicts: bool) -> Result<()> {
     let args = RunCommandArgs::from_command_args(args)?;
+
+    if !args.path.exists() {
+        return Err(crate::errors::MoldXError2::PathNotFound {
+            path: args.path.clone(),
+            kind: "module",
+        }
+        .into());
+    }
+
     let commands =
         client.commands_for_module(&args.command, &args.path.to_path_buf(), &args.profiles);
 
-    let command = if commands.len() > 1 {
-        let selection = Select::new()
-            .with_prompt("Multiple commands found, select one")
-            .items(&commands)
-            .default(0)
-            .interact()?;
+    if commands.is_empty() {
+        if !args.profiles.is_empty() {
+            let requested = args.profiles[0].clone();
+            let available = client.profiles_for_module(&args.path);
+            if !available.iter().any(|profile| profile.name == requested) {
+                return Err(crate::errors::MoldXError2::ProfileNotAvailable {
+                    name: requested,
+                    path: args.path.clone(),
+                }
+                .into());
+            }
+            return Err(crate::errors::MoldXError2::CommandNotFoundInProfile {
+                name: args.command.clone(),
+                profile: requested,
+            }
+            .into());
+        }
+        return Err(crate::errors::MoldXError2::CommandNotFound {
+            name: args.command.clone(),
+            path: args.path.clone(),
+        }
+        .into());
+    }
 
-        &commands[selection]
+    let command = if commands.len() > 1 {
+        if skip_conflicts || args.profiles.is_empty() {
+            &commands[0]
+        } else if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
+            let selection = Select::new()
+                .with_prompt("Multiple commands found, select one")
+                .items(&commands)
+                .default(0)
+                .interact()?;
+
+            &commands[selection]
+        } else {
+            return Err(anyhow::anyhow!(
+                "Multiple commands found for '{}' in module '{}'; rerun with --skip-conflicts or a TTY",
+                args.command,
+                args.path.display()
+            ));
+        }
     } else {
         &commands[0]
     };

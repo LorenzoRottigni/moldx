@@ -200,6 +200,29 @@ impl Display for MoldXClient {
         writeln!(f, "{} {}", "profiles:".bold().yellow(), self.profiles.len())?;
         for profile in &self.profiles {
             writeln!(f, "  {}", profile.name.bold().green())?;
+            if profile.template.file_names.is_empty() {
+                writeln!(f, "    template: empty")?;
+            } else {
+                let template_names = profile
+                    .template
+                    .file_names
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(f, "    template: {}", template_names)?;
+            }
+            if profile.commands.is_empty() {
+                writeln!(f, "    commands: none")?;
+            } else {
+                let commands = profile
+                    .commands
+                    .iter()
+                    .map(|c| c.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                writeln!(f, "    commands: {}", commands)?;
+            }
         }
         writeln!(f, "{} {}", "modules:".bold().yellow(), self.modules.len())?;
         for module in &self.modules {

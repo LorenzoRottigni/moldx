@@ -113,7 +113,8 @@ impl Profile {
         discovered: &mut Vec<Command>,
         profile_names: &[String],
     ) {
-        if profile_names.first().is_none_or(|n| self.name == *n)
+        if self.template.matches(module_path)
+            && profile_names.first().is_none_or(|n| self.name == *n)
             && let Some(command) = self.get_local_command(&command_name.to_string())
         {
             discovered.push(command);
@@ -121,6 +122,7 @@ impl Profile {
 
         self.profiles
             .iter()
+            .filter(|p| p.template.matches(module_path))
             .filter(|p| profile_names.first().is_none_or(|n| p.name == *n))
             .for_each(|p| {
                 p.commands_for_module(

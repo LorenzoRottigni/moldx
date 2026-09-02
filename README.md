@@ -1,12 +1,46 @@
 # MoldX
 
-Technology-agnostic CLI tool that brings convention and automation to project workflows.
+MoldX is a convention-based CLI for discovering project modules and running technology-specific workflows across them.
 
-MoldX detects what kind of code lives where, associates project modules with **strategies**, and lets you run or scaffold commands for those modules. Shell scripts are the default execution contract, keeping MoldX simple, portable, and easy to extend.
+It detects the technologies and conventions present in a project, associates modules with **profiles**, and resolves the commands available for each module. Shell scripts serve as the default execution contract, keeping MoldX simple, portable, and easy to extend.
 
-MoldX was created to solve a real-world problem encountered in a monorepo containing multiple modules written in different languages and technologies. The project was managed through a Makefile and a growing collection of Bash scripts, with custom logic required to determine which commands and workflows applied to each module.
+MoldX was created to solve a common problem in heterogeneous projects and monorepos: as modules adopt different languages, frameworks, and deployment strategies, project automation often grows into an increasingly complex collection of Makefiles, Bash scripts, and custom logic for determining which workflows apply to which modules.
 
-MoldX aims to turn that implicit project knowledge into a conventional, discoverable, and automatable project structure.
+MoldX turns this implicit project knowledge into a conventional, discoverable, and automatable structure.
+
+## Why MoldX?
+
+Modern projects are rarely built around a single technology. A repository may contain Node.js applications, Rust services, Python workers, Docker configurations, and framework-specific projects side by side.
+
+Each module may require different workflows:
+
+- a Rust service can be built and tested with Cargo;
+- a Node.js application can expose build and test commands;
+- a Nuxt application can additionally provide development and production commands;
+- a Docker-enabled module can be built, tagged, and deployed.
+
+Traditional automation tools typically centralize this knowledge in configuration files, Makefiles, or custom scripts. As projects grow, these abstractions often become increasingly difficult to maintain and require explicit logic to determine which commands apply to each module.
+
+MoldX takes a different approach: **the structure of the project becomes the configuration**.
+
+Modules are discovered from the filesystem and associated with profiles based on conventions. Commands are then resolved dynamically from the profiles matched by each module.
+
+A module is not limited to a single profile. For example, a service containing both a `package.json` and a `Dockerfile` can simultaneously expose Node.js and Docker workflows:
+
+```text
+packages/api/
+├── package.json
+├── Dockerfile
+└── ...
+```
+
+```bash
+moldx test packages/api
+moldx docker build packages/api
+moldx docker deploy packages/api
+```
+
+This allows project automation to remain decentralized and technology-specific while still providing a consistent interface across the entire repository.
 
 ## Getting Started
 
@@ -26,108 +60,132 @@ From the root of a Git repository:
 moldx init
 ```
 
-This creates the `.moldx` directory used by MoldX to store strategies, templates, and commands.
+This creates the `.moldx` directory used by MoldX to store profiles, templates, and commands.
 
-### Create a strategy
-
-```bash
-moldx new strategy docker
-```
-
-### Create a strategy template
-
-```bash
-moldx new template docker .docker/Dockerfile .docker/compose.yml
-```
-
-Any module containing the files represented by this template can then be associated with the `docker` strategy.
-
-### Create a command
-
-```bash
-moldx new command docker build
-```
-
-This scaffolds:
+### Example Project Structure
 
 ```text
-.moldx/
-└── strategies/
-    └── docker/
-        └── bin/
-            └── build.sh
+project/
+├── .moldx/
+│   ├── bin/ # moldx <command> <target>
+│   │   ├── diff.sh
+│   │   └── version.sh
+│   │
+│   └── profiles/
+│       ├── docker/
+│       │   ├── template/ # matches modules containing a Dockerfile
+│       │   │   └── Dockerfile
+│       │   └── bin/ # moldx docker <command> <target>
+│       │       ├── build.sh
+│       │       ├── run.sh
+│       │       ├── push.sh
+│       │       ├── tag.sh
+│       │       └── deploy.sh
+│       │
+│       ├── rust/
+│       │   ├── template/ # matches modules containing a Cargo.toml
+│       │   │   └── Cargo.toml
+│       │   └── bin/ # moldx rust <command> <target>
+│       │       ├── build.sh
+│       │       ├── test.sh
+│       │       └── run.sh
+│       │
+│       ├── node/
+│       │   ├── template/ # matches modules containing a package.json
+│       │   │   └── package.json
+│       │   ├── bin/ # moldx node <command> <target>
+│       │   │   ├── build.sh
+│       │   │   └── test.sh
+│       │   └── profiles/
+│       │       ├── nuxt/
+│       │       │   ├── template/ # matches modules containing package.json and nuxt.config.ts
+│       │       │   │   ├── package.json
+│       │       │   │   └── nuxt.config.ts
+│       │       │   └── bin/ # moldx node nuxt <command> <target>
+│       │       │       ├── dev.sh
+│       │       │       └── start.sh
+│       │       │
+│       │       └── next/
+│       │           ├── template/ # matches modules containing package.json and next.config.ts
+│       │           │   ├── package.json
+│       │           │   └── next.config.ts
+│       │           └── bin/ # moldx node next <command> <target>
+│       │               ├── dev.sh
+│       │               └── start.sh
+│       │
+│       └── python/
+│           ├── template/ # matches any module
+│           ├── bin/ # moldx python <command> <target>
+│           │   ├── lint.sh
+│           │   └── test.sh
+│           │
+│           └── profiles/
+│               ├── pip/
+│               │   ├── template/ # matches modules containing requirements.txt
+│               │   │   └── requirements.txt
+│               │   └── bin/ # moldx python pip <command> <target>
+│               │       ├── install.sh
+│               │       ├── build.sh
+│               │       └── run.sh
+│               │
+│               └── uv/
+│                   ├── template/ # matches modules containing pyproject.toml
+│                   │   └── pyproject.toml
+│                   └── bin/ # moldx python uv <command> <target>
+│                       ├── install.sh
+│                       ├── build.sh
+│                       └── run.sh
+│
+└── packages/
 ```
 
-The generated shell script becomes the implementation of the `build` command for the `docker` strategy.
+## Glossary
 
-### Run a command
+### Profile
 
-```bash
-moldx docker build packages/docker-module
-```
+A **profile** is a collection of commands related to a specific **technology** that can be applied to a particular type of **module**.
 
-If exactly one strategy associated with the target provides the requested command, the strategy can be omitted:
+Profiles can be nested to provide more specific implementations for sub-technologies (for example, `node > nuxt`, `node > next`, or `python > pip`, `python > uv`).
 
-```bash
-moldx build packages/docker-module
-```
-
-## Concepts
-
-### Strategy
-
-A **strategy** is a collection of commands applicable to a particular kind of target.
-
-A strategy is identified through one or more templates. For example, a `docker` strategy might use Docker-related files to determine whether a module is a Docker module.
-
-A strategy can provide commands such as:
-
-```text
-build
-test
-run
-publish
-```
-
-The same command name can exist in multiple strategies while having different implementations.
+Profiles are associated with modules through **templates**. A parent profile's template must be compatible with the templates of its child profiles.
 
 ### Command
 
 A **command** is an executable workflow managed by MoldX.
 
-Commands are normally implemented as shell scripts and may belong to a specific strategy or be strategy-agnostic.
+Commands are typically implemented as shell scripts and may belong to a specific profile or be profile-agnostic.
 
 For example:
 
 ```text
-.moldx/strategies/docker/bin/build.sh
+.moldx/profiles/docker/bin/build.sh
 ```
 
-defines the `build` command for the `docker` strategy.
+defines the `build` command for the `docker` profile.
 
 ### Template
 
-A **template** describes the files that identify a module as belonging to a strategy.
+A **template** describes the files that identify a module as belonging to a profile.
 
 For example:
 
 ```text
-.docker/
+docker/
 ├── Dockerfile
 └── compose.yml
 ```
 
-A Docker template containing those files can be used to identify Docker modules.
+A Docker template containing these files can be used to identify Docker modules.
 
-Templates are not necessarily scaffolding templates in the traditional sense. They primarily act as a convention used for module detection.
+Templates are not necessarily scaffolding templates in the traditional sense. Their primary purpose is to define conventions used for module detection.
 
 ### Module
 
 A **module** is a project directory that can be targeted by MoldX commands.
 
-A module becomes associated with one or more strategies when it matches their templates.
+A module becomes associated with one or more profiles when it matches their templates.
 
-A module may match multiple strategies.
+A module may match multiple profiles.
 
 For example:
 
@@ -138,23 +196,7 @@ packages/my-service/
 └── ...
 ```
 
-could potentially match both a `node` strategy and a `docker` strategy.
-
-### Target
-
-A **target** is the path supplied to a MoldX command representing the module on which the command should operate.
-
-For example:
-
-```bash
-moldx docker build packages/my-service
-```
-
-Here:
-
-- `docker` is the strategy
-- `build` is the command
-- `packages/my-service` is the target
+could potentially match both the `node` and `docker` profiles.
 
 ### Executor
 
@@ -162,150 +204,92 @@ An **executor** defines how a MoldX command is ultimately executed.
 
 Shell is the default execution mechanism. Additional executors are planned for future versions.
 
-## Project Structure
-
-A typical MoldX project looks like this:
-
-```text
-project/
-├── .moldx/
-│   └── strategies/
-│       ├── docker/
-│       │   ├── bin/
-│       │   │   ├── build.sh
-│       │   │   └── run.sh
-│       │   └── templates/
-│       │       └── docker/
-│       │           ├── Dockerfile
-│       │           └── compose.yml
-│       │
-│       └── node/
-│           ├── bin/
-│           │   ├── build.sh
-│           │   └── test.sh
-│           └── templates/
-│               └── node/
-│                   └── package.json
-│
-└── packages/
-    ├── api/
-    └── web/
-```
-
-The exact directory layout is configurable through MoldX options and environment variables.
-
-## Setup
-
-### Initialize MoldX
-
-Create the `.moldx` directory in the project:
-
-```bash
-moldx init
-```
-
-### Create a strategy
-
-```bash
-moldx new strategy docker
-```
-
-### Create a template
-
-```bash
-moldx new template docker .docker/Dockerfile .docker/compose.yml
-```
-
-A module containing the relevant template files can then be associated with the `docker` strategy.
-
-### Create a strategy command
-
-```bash
-moldx new command docker build
-```
-
-MoldX scaffolds:
-
-```text
-.moldx/strategies/docker/bin/build.sh
-```
-
-An `--edit` option is planned to open the generated command using the editor configured through `$EDITOR`.
-
-### Create a strategy-agnostic command
-
-If no strategy is supplied, the command belongs to the default strategy-agnostic command set:
-
-```bash
-moldx new command clean
-```
-
-### Run a strategy command
-
-```bash
-moldx docker build packages/docker-module
-```
-
-### Run an unambiguous command
-
-If only one strategy associated with the target provides the requested command, the strategy can be omitted:
-
-```bash
-moldx build packages/docker-module
-```
-
-If multiple strategies provide the same command, MoldX can require the strategy to be specified explicitly.
-
 ## CLI
 
-### `moldx [strategy] <command> <target>`
+### `moldx [OPTIONS...] [PROFILE...] <COMMAND> [MODULE] [-- <COMMAND_OPTIONS>...]`
 
-Run a command against a target.
+Runs a command against one or more modules.
+For convenience, the module parameter is optional, allowing MoldX to support commands that are not tied to a specific module.
 
-Examples:
+#### Profiles
 
-```bash
-moldx docker build packages/docker-module
-moldx node test packages/api
-```
-
-If the command is unambiguous for the target:
+Profiles can be specified to explicitly select the profile from which the command
+should be resolved.
 
 ```bash
-moldx build packages/docker-module
+moldx docker build packages/server
+moldx python uv build packages/worker
 ```
 
-### `moldx init`
+Profiles can be omitted. When a command is not qualified by a profile, MoldX
+resolves it from the profiles matching the target module.
 
-Initialize MoldX in the current project.
+If multiple matching profiles provide a command with the requested name, MoldX
+prompts the user to resolve the conflict.
 
 ```bash
-moldx init
+moldx build packages/server
+
+# STDIN
+# -> python/uv/build
+# -> python/pip/build
+# -> docker/build
 ```
 
-### `moldx new`
+Command conflicts can be skipped using the `--skip-conflicts` option, avoiding
+manual input.
 
-Create MoldX entities.
+#### Multiple Modules
+
+Commands can target multiple modules using glob patterns.
 
 ```bash
-moldx new strategy <strategy>
-moldx new template <strategy> [...template-files]
-moldx new command [strategy] <command>
+moldx install packages/*
 ```
 
-### `moldx list`
+The `*` pattern is expanded by the shell and allows commands to target multiple modules at the same directory level.
 
-List available strategies, commands, templates, and/or resolved modules.
-
-The exact output is subject to the CLI implementation.
-
-### `moldx ui`
-
-Start the MoldX terminal user interface.
+MoldX also supports the `**` pattern as a recursive module glob. Unlike standard shell glob expansion, MoldX interprets `**` itself, allowing recursive module matching independently of the shell's globstar configuration.
 
 ```bash
-moldx ui
+# Match modules directly under packages/
+moldx install packages/*
+
+# Recursively match modules under packages/
+moldx install packages/**
 ```
+
+For each matching module, MoldX resolves the requested command independently from the profiles associated with that module.
+
+#### Command Options
+
+Arguments following `--` are forwarded unchanged to the resolved command.
+
+Positional command arguments are only supported after `--`.
+
+```bash
+moldx docker build packages/server -- --platform linux/amd64 --push
+```
+
+In this example, `--platform linux/amd64 --push` are passed directly to the
+resolved `docker/build` command.
+
+### `moldx [-- <OPTIONS>...] init <ENTITY> <PROFILE...> [ARGS...]`
+
+- `moldx init` => creates `.moldx/README.md`, `.moldx/bin/.keep`, and `.moldx/profiles/.keep`
+- `moldx init profile <...profile>` => creates `.moldx/profiles/<profile>/bin` and `.moldx/profiles/<profile>/template` (supports nested profiles)
+- `moldx init command [...profile] <command>` => creates `.moldx/profiles/<profile>/bin/<command>` (supports nested profiles)
+- `moldx init template [...profile] [...file_names]` => creates `.moldx/profiles/<profile>/template/<...file_names>` (supports nested profiles)
+
+Creating MoldX entities through the `init` command allows MoldX to validate input, enforce constraints, and prevent undefined or invalid configurations.
+
+### `moldx status`
+
+Prints the state of the MoldX client after initialization, including available profiles, commands, templates, and resolved modules.
+
+### moldx
+
+Runs the MoldX TUI in the current working directory.
 
 ## Guidelines
 
@@ -317,7 +301,7 @@ MoldX is designed to work inside a Git repository, and the `.moldx` directory sh
 
 The `.moldx` path can also be supplied explicitly through a command-line argument or environment variable, allowing MoldX to operate outside a Git repository.
 
-By convention, MoldX expects `.moldx` at the root of the repository.
+By convention, MoldX expects `.moldx` to be located at the root of the repository.
 
 If it is not found there, MoldX can search the Git workspace within the configured maximum resolution depth.
 
@@ -331,20 +315,6 @@ Module discovery is recursive and limited by the configured maximum resolution d
 
 This prevents MoldX from unnecessarily traversing the entire filesystem while still supporting common monorepo layouts.
 
-### Multiple Strategies
-
-A module may match more than one strategy.
-
-For example, a module could simultaneously be:
-
-- a Node.js module
-- a Docker module
-- a Terraform module
-
-This allows strategies to represent independent capabilities rather than forcing every module into a single technology classification.
-
-When a command exists in multiple matching strategies, MoldX should require the strategy to be specified explicitly or provide an interactive selection mechanism.
-
 ## Configuration
 
 MoldX is designed to be **configuration-light**.
@@ -354,33 +324,12 @@ Project behavior is primarily inferred from the `.moldx` directory structure rat
 Global path-resolution and naming behavior can be customized through command-line arguments or environment variables.
 
 | Environment variable | CLI option | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `MOLDX_DIR` | `--moldx-dir` | `./.moldx` | Path to the MoldX directory |
-| `MOLDX_STRATEGIES_DIR_NAME` | `--strategies-dir-name` | `strategies` | Strategies directory name |
-| `MOLDX_BIN_DIR_NAME` | `--bin-dir-name` | `bin` | Commands directory name inside a strategy |
-| `MOLDX_TEMPLATES_DIR_NAME` | `--templates-dir-name` | `templates` | Templates directory name inside a strategy |
+| `MOLDX_PROFILES_DIR_NAME` | `--profiles-dir-name` | `profiles` | Profiles directory name |
+| `MOLDX_BIN_DIR_NAME` | `--bin-dir-name` | `bin` | Commands directory name inside a profile |
 | `MOLDX_TEMPLATE_DIR_NAME` | `--template-dir-name` | `template` | Template directory naming convention |
 | `MOLDX_MAX_RESOLUTION_DEPTH` | `--max-resolution-depth` | implementation-defined | Maximum recursion depth for `.moldx` and module resolution |
-
-## Shell Command Contract
-
-Shell is the default execution contract for MoldX commands.
-
-A generated command is a shell script that receives the target and command arguments according to the MoldX command contract.
-
-For example:
-
-```bash
-#!/usr/bin/env bash
-
-set -e
-
-target="$1"
-
-# command implementation
-```
-
-The exact argument contract should be considered part of the public MoldX CLI specification and documented as the executor model evolves.
 
 ## TUI
 
@@ -388,7 +337,7 @@ MoldX provides a terminal user interface capable of exposing MoldX's CLI functio
 
 The TUI is intended to make common operations easier to discover, particularly when:
 
-- multiple strategies match a module;
+- multiple profiles match a module;
 - multiple commands are available;
 - users want to browse available modules;
 - users do not remember the exact CLI syntax.
@@ -396,30 +345,6 @@ The TUI is intended to make common operations easier to discover, particularly w
 Future versions may allow the TUI to connect to the MoldX daemon.
 
 ## Roadmap
-
-### Recursive Profiles instead of Strategies
-
-Replace the current flat strategy model with recursive profiles.
-
-A profile represents a specialization of its parent scope. Each profile contains exactly one template used to identify matching modules and may provide commands and further specialized profiles.
-
-This provides a natural hierarchy of specializations, enables command inheritance from parent scopes, and removes the need for an agnostic strategy.
-
-```text
-.moldx/
-├── bin/
-└── profiles/
-    └── python/
-        ├── bin/
-        ├── template/
-        └── profiles/
-            ├── uv/
-            │   ├── bin/
-            │   └── template/
-            └── legacy/
-                ├── bin/
-                └── template/
-```
 
 ### Executor Support
 
@@ -435,26 +360,7 @@ executors/
 
 An executor could wrap another runtime while preserving a common command interface.
 
-A formal argument contract will be needed so that commands implemented using different executors receive parameters consistently.
-
-### Interactive Command Selection
-
-When a target matches multiple strategies that expose the same command, MoldX should be able to interactively ask the user which strategy to execute.
-
-For example:
-
-```bash
-moldx build ./multi-strategy-target
-```
-
-If the target matches both `docker` and `node` strategies, MoldX could display:
-
-```text
-Which build strategy do you want to run?
-
-> docker
-  node
-```
+A formal argument contract will be required to ensure that commands implemented using different executors receive parameters consistently.
 
 ### Daemon
 
@@ -463,20 +369,20 @@ Add an optional MoldX daemon for long-running project interaction.
 The proposed model is:
 
 ```text
-             ┌─────────────┐
-CLI ────────►│             │
-             │ MoldX daemon│
-TUI ────────►│             │
-             │             │
-VS Code ────►│             │
-             └─────────────┘
+              ┌─────────────┐
+CLI ─────────►│             │
+              │ MoldX daemon│
+TUI ─────────►│             │
+              │             │
+VS Code ─────►│             │
+              └─────────────┘
 ```
 
 When a daemon is running, CLI commands and the TUI can connect to it.
 
-When no daemon is running, CLI commands should continue to work directly, while the TUI can optionally start one.
+When no daemon is running, CLI commands should continue to work directly, while the TUI may optionally start one.
 
-The daemon should primarily exist to support stateful integrations and long-lived clients rather than being required for normal CLI execution.
+The daemon should primarily support stateful integrations and long-lived clients rather than being required for normal CLI execution.
 
 ### VS Code Integration
 
@@ -485,7 +391,7 @@ Create a VS Code extension capable of connecting to the MoldX daemon.
 Potential functionality includes:
 
 - browsing modules;
-- browsing strategies;
+- browsing profiles;
 - browsing available commands;
 - running commands;
 - viewing command output;
@@ -501,7 +407,7 @@ For example, detecting:
 package.json
 ```
 
-could suggest or scaffold a Node.js strategy with common commands such as:
+could suggest or scaffold a Node.js profile with common commands such as:
 
 ```text
 test
@@ -516,26 +422,15 @@ This should remain opt-in or reviewable so that `init` does not unexpectedly mod
 
 ### Git Submodules
 
-Explore using Git submodules to distribute reusable MoldX strategies outside individual monorepos.
+Explore using Git submodules to distribute reusable MoldX profiles outside individual monorepos.
 
-This could allow teams to maintain shared strategy collections independently from the projects consuming them.
-
-### Dev Containers
-
-Explore integration with development containers.
-
-Potential integrations include:
-
-- detecting Dev Container configuration;
-- providing a Dev Container strategy;
-- running container-specific workflows;
-- exposing MoldX commands inside the development environment.
+This could allow teams to maintain shared profile collections independently from the projects consuming them.
 
 ## Contributing
 
 Contributions are welcome.
 
-MoldX is still evolving, and contributions around CLI design, module resolution, strategy conventions, executors, the TUI, and integrations are especially useful.
+MoldX is still evolving, and contributions around CLI design, module resolution, profile conventions, executors, the TUI, and integrations are especially valuable.
 
 ### Development
 
@@ -545,7 +440,9 @@ Typical development commands:
 
 ```bash
 cargo build
+
 cargo test
+
 cargo run -- --help
 ```
 
@@ -561,7 +458,7 @@ When running MoldX locally:
 cargo run -- list
 ```
 
-MoldX automatically resolves the playground's `.moldx` directory, making it possible to test strategies, templates, commands, and module resolution without modifying the development environment itself.
+MoldX automatically resolves the playground's `.moldx` directory, making it possible to test profiles, templates, commands, and module resolution without modifying the development environment itself.
 
 The playground should be treated as an integration-testing environment for MoldX itself.
 

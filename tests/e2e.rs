@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -207,4 +208,21 @@ fn help_flag_exits_successfully() {
 #[test]
 fn detect_help_shows_subcommand() {
     moldx().args(["detect", "--help"]).assert().success();
+}
+
+#[test]
+fn status_is_the_public_cli_entrypoint() {
+    moldx()
+        .args(["status"])
+        .assert()
+        .success()
+        .stdout(contains("profiles:"))
+        .stdout(contains("modules:"));
+
+    moldx()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(contains("status"))
+        .stdout(predicates::str::contains("list").not());
 }

@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_strategy_removed() {
+    fn test_from_str_rejects_unknown_entity() {
         let result = "strategy".parse::<Entity>();
         assert!(result.is_err());
     }

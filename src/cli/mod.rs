@@ -25,6 +25,13 @@ pub struct Cli {
     pub command: Option<Command>,
 
     #[arg(
+        long = "skip-conflicts",
+        global = true,
+        help = "Automatically select the first matching command when multiple profiles expose the same command"
+    )]
+    pub skip_conflicts: bool,
+
+    #[arg(
         long = "moldx-dir",
         env = "MOLDX_DIR",
         global = true,
@@ -93,7 +100,9 @@ impl Cli {
     ///
     /// Returns an error if the selected subcommand fails.
     pub async fn exec_with(self, client: &MoldXClient) -> Result<()> {
-        self.command.unwrap_or(Command::Ui).exec_with(client).await
+        let skip_conflicts = self.skip_conflicts;
+        let command = self.command.unwrap_or(Command::Ui);
+        command.exec_with(client, skip_conflicts).await
     }
 }
 
@@ -109,14 +118,17 @@ pub enum Command {
         path: PathBuf,
     },
 
-    /// List all discovered modules under a root path
-    List,
+    Status,
 
-    /// Create a new .moldx/ directory structure in the current working directory
-    Init,
+    /// Create or initialize a MoldX project structure.
+    /// Supported forms: `moldx init`, `moldx init profile ...`,
+    /// `moldx init command ...`, and `moldx init template ...`.
+    Init {
+        #[arg(required = false, num_args = 0..)]
+        args: Vec<String>,
+    },
 
-    /// Run a command: moldx [profile] <command> <path>
-    /// Profile is optional; if omitted, the best matching profile is used.
+    /// Run a command: moldx [profile...] <command> <path> [-- <command options...>]
     #[command(external_subcommand)]
     Run(Vec<String>),
 
@@ -130,23 +142,14 @@ pub enum Command {
 
 /// Dispatch logic for each variant.
 impl Command {
-    async fn exec_with(self, client: &MoldXClient) -> Result<()> {
-        // commands/run.rs => pub RunCommandArgs(Vec<String>) -> Self
-        // args.rs => MoldXCommandArgs(Vec<String>) -> Self
-
-        // parse command args from Vec<String> to a typed struct
-        // autoresolve or stdin required args from typed struct
-        // provide typed struct to command handler
-
-        // MoldXCommandArgs.resolve(self) ->
-
+    async fn exec_with(self, client: &MoldXClient, skip_conflicts: bool) -> Result<()> {
         match self {
             Self::Ui => commands::ui::ui(client).await,
             Self::Detect { path } => commands::detect::detect(client, path).await,
-            Self::List => commands::list::list(client).await,
-            Self::Init => commands::init::init(client).await,
+            Self::Status => commands::status::status(client).await,
+            Self::Init { args } => commands::init::init(client, args).await,
             Self::New { args } => commands::new::new(client, args).await,
-            Self::Run(args) => commands::run::run(client, args).await,
+            Self::Run(args) => commands::run::run(client, args, skip_conflicts).await,
         }
     }
 }

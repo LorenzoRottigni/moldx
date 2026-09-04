@@ -65,30 +65,36 @@ fi
 
 # ── Download ─────────────────────────────────────────────────────────────────
 
-DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET_NAME}"
+ARCHIVE_NAME="${ASSET_NAME}-${TAG}.tar.gz"
+DOWNLOAD_BASE="https://github.com/${REPO}/releases/download/${TAG}"
 
-TMP=$(mktemp)
-trap 'rm -f "$TMP"' EXIT
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+ARCHIVE_PATH="${TMP_DIR}/${ARCHIVE_NAME}"
+CHECKSUMS_PATH="${TMP_DIR}/SHA256SUMS"
 
 echo "moldx ${TAG} (${PLATFORM}/${ARCH_LABEL})"
-echo "Downloading from ${DOWNLOAD_URL} ..."
+echo "Downloading ${ARCHIVE_NAME} ..."
 
-if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMP"; then
-  echo "error: download failed. Check that ${TAG} has a '${ASSET_NAME}' asset." >&2
+if ! curl -fsSL "${DOWNLOAD_BASE}/${ARCHIVE_NAME}" -o "$ARCHIVE_PATH"; then
+  echo "error: download failed. Check that ${TAG} has a '${ARCHIVE_NAME}' asset." >&2
   exit 1
 fi
 
-chmod +x "$TMP"
+curl -fsSL "${DOWNLOAD_BASE}/SHA256SUMS" -o "$CHECKSUMS_PATH"
+grep "  ${ARCHIVE_NAME}$" "$CHECKSUMS_PATH" | sha256sum -c -
+tar -xzf "$ARCHIVE_PATH" -C "$TMP_DIR"
+chmod +x "${TMP_DIR}/${BINARY}"
 
 # ── Install ──────────────────────────────────────────────────────────────────
 
 DEST="${INSTALL_DIR}/${BINARY}"
 
 if [ -w "$INSTALL_DIR" ]; then
-  mv "$TMP" "$DEST"
+  mv "${TMP_DIR}/${BINARY}" "$DEST"
 else
   echo "Installing to ${DEST} (requires sudo)..."
-  sudo mv "$TMP" "$DEST"
+  sudo mv "${TMP_DIR}/${BINARY}" "$DEST"
 fi
 
 echo ""

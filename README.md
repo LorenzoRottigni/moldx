@@ -46,9 +46,38 @@ This allows project automation to remain decentralized and technology-specific w
 
 ### Installation
 
+The release workflow publishes checksummed archives for Linux, macOS, and
+Windows on both x86_64 and ARM64:
+
+```text
+moldx-linux-x86_64-vX.Y.Z.tar.gz
+moldx-linux-aarch64-vX.Y.Z.tar.gz
+moldx-macos-x86_64-vX.Y.Z.tar.gz
+moldx-macos-aarch64-vX.Y.Z.tar.gz
+moldx-windows-x86_64-vX.Y.Z.zip
+moldx-windows-aarch64-vX.Y.Z.zip
+SHA256SUMS
+```
+
+Download the appropriate archive from the [GitHub Releases](https://github.com/LorenzoRottigni/moldx/releases) page and verify it against `SHA256SUMS`.
+
+On Linux or macOS, the installer selects the current CPU architecture,
+downloads the latest release archive, and verifies its checksum:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.sh | bash
 ```
+
+To install a specific version or directory:
+
+```bash
+MOLDX_VERSION=v0.1.0 MOLDX_INSTALL_DIR="$HOME/.local/bin" \
+    curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.sh | bash
+```
+
+On Windows, download `moldx-windows-x86_64-vX.Y.Z.zip` or
+`moldx-windows-aarch64-vX.Y.Z.zip` from GitHub Releases, verify its SHA256
+entry, extract `moldx.exe`, and place it on `PATH`.
 
 > **Note:** Installation through package managers for common Linux distributions is planned.
 

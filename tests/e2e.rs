@@ -67,7 +67,7 @@ fn detect_multi_profile_module_reports_all() {
 #[test]
 fn list_discovers_all_modules() {
     moldx()
-        .args(["list"])
+        .args(["status"])
         .assert()
         .success()
         .stdout(contains("auth-service"))
@@ -79,7 +79,7 @@ fn list_discovers_all_modules() {
 #[test]
 fn list_shows_profile_names() {
     moldx()
-        .args(["list"])
+        .args(["status"])
         .assert()
         .success()
         .stdout(contains("docker"))
@@ -141,6 +141,30 @@ fn run_command_on_multi_profile_module() {
         .assert()
         .success()
         .stdout(contains("docker/logs"));
+}
+
+#[test]
+fn run_unqualified_conflict_requires_resolution() {
+    // `build` is offered by several profiles for the multi-profile module;
+    // without a TTY or --skip-conflicts this must not silently pick one.
+    moldx()
+        .args(["build", module("multi-profile").to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(contains("--skip-conflicts"));
+}
+
+#[test]
+fn run_unqualified_conflict_skipped_with_flag() {
+    moldx()
+        .args([
+            "--skip-conflicts",
+            "build",
+            module("multi-profile").to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(contains("docker/build"));
 }
 
 // ── validation failures ───────────────────────────────────────────────────────

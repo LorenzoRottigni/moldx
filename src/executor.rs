@@ -26,7 +26,6 @@ pub enum ProcessStatus {
     Failed(String),
     Killed,
 }
-
 /// Accessors for status information.
 impl ProcessStatus {
     /// Returns a plain-text label for the status.
@@ -184,12 +183,13 @@ impl Executor {
     /// Runs a script to completion and returns its exit code.
     ///
     /// The script is executed with `bash` and receives the module path as
-    /// its first argument.
+    /// its first argument, followed by any additional command options.
     ///
     /// # Arguments
     ///
     /// * `script` - Path to the shell script to execute.
     /// * `module_path` - Path passed to the script as its first argument.
+    /// * `args` - Additional arguments forwarded to the script.
     ///
     /// # Returns
     ///
@@ -202,12 +202,25 @@ impl Executor {
         &self,
         script: &Path,
         module_path: &Path,
+        args: &[String],
     ) -> Result<i32> {
-        let status = Command::new("bash")
-            .arg(script)
-            .arg(module_path)
-            .status()
-            .await?;
+        self.exec_blocking_optional(Some(module_path), script, args)
+            .await
+    }
+
+    /// Runs a script with an optional module path followed by command options.
+    pub async fn exec_blocking_optional(
+        &self,
+        module_path: Option<&Path>,
+        script: &Path,
+        args: &[String],
+    ) -> Result<i32> {
+        let mut command = Command::new("bash");
+        command.arg(script);
+        if let Some(module_path) = module_path {
+            command.arg(module_path);
+        }
+        let status = command.args(args).status().await?;
 
         Ok(status.code().unwrap_or(1))
     }
@@ -401,6 +414,76 @@ impl Display for Executor {
     }
 }
 
+/// Spawns `script` in the background, streams its output into the executor,
+/// and updates the process status when it exits.
+pub async fn run_and_track(
+    executor: Arc<Executor>,
+    id: u64,
+    script: std::path::PathBuf,
+    module_path: std::path::PathBuf,
+) {
+    use std::process::Stdio;
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    let mut cmd = Command::new("bash");
+    cmd.arg(&script)
+        .arg(&module_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            executor.update_status(id, ProcessStatus::Failed(e.to_string()));
+            return;
+        }
+    };
+
+    let pid = child.id();
+    executor.update_pid(id, pid);
+
+    if let Some(stdout) = child.stdout.take() {
+        let executor2 = executor.clone();
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                executor2.append_output(id, line);
+            }
+        });
+    }
+
+    if let Some(stderr) = child.stderr.take() {
+        let executor2 = executor.clone();
+        tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                executor2.append_output(id, format!("[err] {}", line));
+            }
+        });
+    }
+
+    match child.wait().await {
+        Ok(status) => {
+            if status.success() {
+                executor.update_status(id, ProcessStatus::Completed(status.code().unwrap_or(0)));
+            } else {
+                executor.update_status(
+                    id,
+                    ProcessStatus::Failed(format!("exit code {}", status.code().unwrap_or(-1))),
+                );
+            }
+        }
+        Err(e) => {
+            executor.update_status(id, ProcessStatus::Failed(e.to_string()));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -571,7 +654,7 @@ mod tests {
         executor.kill_all_running();
         let summaries = executor.get_summaries();
         assert_eq!(summaries.iter().find(|s| s.id == id1).unwrap().status, ProcessStatus::Killed);
-        assert!(summaries.iter().find(|s| s.id == id2).unwrap().status.is_running() == false);
+        assert!(!summaries.iter().find(|s| s.id == id2).unwrap().status.is_running());
         assert_eq!(summaries.iter().find(|s| s.id == id3).unwrap().status, ProcessStatus::Killed);
     }
 
@@ -597,7 +680,7 @@ mod tests {
         let script = dir.path().join("test.sh");
         std::fs::write(&script, "#!/bin/bash\nexit 0").unwrap();
         let executor = Executor::new();
-        let code = executor.exec_blocking(&script, dir.path()).await.unwrap();
+        let code = executor.exec_blocking(&script, dir.path(), &[]).await.unwrap();
         assert_eq!(code, 0);
     }
 
@@ -607,7 +690,7 @@ mod tests {
         let script = dir.path().join("fail.sh");
         std::fs::write(&script, "#!/bin/bash\nexit 42").unwrap();
         let executor = Executor::new();
-        let code = executor.exec_blocking(&script, dir.path()).await.unwrap();
+        let code = executor.exec_blocking(&script, dir.path(), &[]).await.unwrap();
         assert_eq!(code, 42);
     }
 
@@ -683,84 +766,3 @@ mod tests {
     }
 }
 
-/// Spawns `script` in the background, streams its output into the executor,
-/// and updates the process status when it exits.
-///
-/// Standard output lines are appended verbatim; standard error lines are
-/// prefixed with `[err]`. On Unix the child runs in its own process group so
-/// it can be killed as a whole.
-///
-/// # Arguments
-///
-/// * `executor` - Shared executor holding the tracked process state.
-/// * `id` - Identifier of the tracked process, as returned by
-///   [`Executor::add_process`].
-/// * `script` - Path to the shell script to execute.
-/// * `module_path` - Path passed to the script as its first argument.
-pub async fn run_and_track(
-    executor: Arc<Executor>,
-    id: u64,
-    script: std::path::PathBuf,
-    module_path: std::path::PathBuf,
-) {
-    use std::process::Stdio;
-    use tokio::io::{AsyncBufReadExt, BufReader};
-
-    let mut cmd = Command::new("bash");
-    cmd.arg(&script)
-        .arg(&module_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    #[cfg(unix)]
-    {
-        cmd.process_group(0);
-    }
-
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
-        Err(e) => {
-            executor.update_status(id, ProcessStatus::Failed(e.to_string()));
-            return;
-        }
-    };
-
-    let pid = child.id();
-    executor.update_pid(id, pid);
-
-    if let Some(stdout) = child.stdout.take() {
-        let executor2 = executor.clone();
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                executor2.append_output(id, line);
-            }
-        });
-    }
-
-    if let Some(stderr) = child.stderr.take() {
-        let executor2 = executor.clone();
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                executor2.append_output(id, format!("[err] {}", line));
-            }
-        });
-    }
-
-    match child.wait().await {
-        Ok(status) => {
-            if status.success() {
-                executor.update_status(id, ProcessStatus::Completed(status.code().unwrap_or(0)));
-            } else {
-                executor.update_status(
-                    id,
-                    ProcessStatus::Failed(format!("exit code {}", status.code().unwrap_or(-1))),
-                );
-            }
-        }
-        Err(e) => {
-            executor.update_status(id, ProcessStatus::Failed(e.to_string()));
-        }
-    }
-}

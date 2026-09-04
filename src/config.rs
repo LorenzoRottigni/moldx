@@ -40,6 +40,9 @@ impl MoldXConfig {
     /// * `templates_dir_name` - Name of the templates subdirectory inside profiles.
     /// * `max_resolution_depth` - Maximum upward search depth.
     /// * `modules_dir` - Optional explicit modules root.
+    /// * `create_if_missing` - When true and the `.moldx` directory is absent,
+    ///   use the given path as-is instead of requiring filesystem discovery.
+    ///   This supports scaffolding commands (e.g. `init`) that create `.moldx`.
     ///
     /// # Returns
     ///
@@ -49,6 +52,7 @@ impl MoldXConfig {
     ///
     /// Returns an error if the `.moldx` directory cannot be found or the
     /// modules root cannot be determined.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         moldx_dir: String,
         profiles_dir_name: String,
@@ -57,9 +61,10 @@ impl MoldXConfig {
         templates_dir_name: String,
         max_resolution_depth: usize,
         modules_dir: Option<String>,
+        create_if_missing: bool,
     ) -> Result<Self> {
         let mut moldx_dir = PathBuf::from(moldx_dir);
-        if !moldx_dir.exists() {
+        if !moldx_dir.exists() && !create_if_missing {
             moldx_dir = fs::discover_path(
                 std::env::current_dir().map_err(|_| MoldXError2::CwdNotFound)?,
                 |path| path.file_name().and_then(|n| n.to_str()) == Some(MOLDX_DIR_NAME),
@@ -133,6 +138,7 @@ mod tests {
             "templates".into(),
             20,
             None,
+            false,
         ).unwrap();
         assert_eq!(config.moldx_dir, moldx_dir);
         assert_eq!(config.profiles_dir, moldx_dir.join("profiles"));
@@ -158,6 +164,7 @@ mod tests {
             "templates".into(),
             20,
             Some(modules_dir.to_str().unwrap().into()),
+            false,
         ).unwrap();
         assert_eq!(config.modules_dir, modules_dir);
     }
@@ -175,10 +182,31 @@ mod tests {
             "templates".into(),
             20,
             None,
+            false,
         ).unwrap();
         let display = config.to_string();
         assert!(display.contains("moldx_dir:"));
         assert!(display.contains("profiles_dir:"));
         assert!(display.contains("modules_dir:"));
+    }
+
+    #[test]
+    fn test_config_new_with_create_if_missing_uses_literal_path() {
+        let dir = tempdir().unwrap();
+        let moldx_dir = dir.path().join(".moldx");
+        // Directory intentionally does not exist.
+        let config = MoldXConfig::new(
+            moldx_dir.to_str().unwrap().into(),
+            "profiles".into(),
+            "bin".into(),
+            "template".into(),
+            "templates".into(),
+            20,
+            None,
+            true,
+        ).unwrap();
+        assert_eq!(config.moldx_dir, moldx_dir);
+        assert_eq!(config.profiles_dir, moldx_dir.join("profiles"));
+        assert_eq!(config.modules_dir, dir.path());
     }
 }

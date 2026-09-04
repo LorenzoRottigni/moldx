@@ -40,7 +40,7 @@ impl Command {
         if !path.is_file() {
             bail!(MoldXError2::PathNotFound {
                 path,
-                kind: "template",
+                kind: "command",
             });
         }
 
@@ -89,7 +89,7 @@ impl Command {
 
         sorted_read_dir(source)?
             .into_iter()
-            .filter(|e| e.path().is_file())
+            .filter(|e| e.path().is_file() && is_shell_script(&e.path()))
             .map(|e| Command::new(e.path()))
             .collect()
     }

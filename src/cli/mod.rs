@@ -11,7 +11,6 @@ use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
 use crate::constants::MOLDX_DIR_NAME;
 
-mod args;
 /// Subcommand handler modules.
 pub mod commands;
 

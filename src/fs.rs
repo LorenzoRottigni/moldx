@@ -41,10 +41,11 @@ pub fn is_shell_script(path: &Path) -> bool {
     path.extension().and_then(|ext| ext.to_str()) == Some("sh")
 }
 
-/// Collects the names of the files directly contained in a directory.
+/// Collects relative names of all visible files contained in a directory.
 ///
-/// Hidden files are skipped and subdirectories are not traversed. When the
-/// given path is a file, a set containing only its own name is returned.
+/// Hidden files and directories are skipped. Relative paths preserve nested
+/// template structure. When the given path is a file, a set containing only
+/// its own name is returned.
 ///
 /// # Arguments
 ///
@@ -67,17 +68,22 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     }
 
     let mut names = BTreeSet::new();
-    for entry in sorted_read_dir(root)? {
+    for entry in WalkDir::new(root).min_depth(1).into_iter().flatten() {
         let path = entry.path();
-        if !path.is_file() {
+        let hidden = path
+            .strip_prefix(root)
+            .ok()
+            .is_some_and(|relative| {
+                relative.components().any(|component| {
+                    component.as_os_str().to_string_lossy().starts_with('.')
+                })
+            });
+        if !path.is_file() || hidden {
             continue;
         }
 
-        if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-            if name.starts_with('.') {
-                continue;
-            }
-            names.insert(name.to_string());
+        if let Ok(relative) = path.strip_prefix(root) {
+            names.insert(relative.to_string_lossy().replace('\\', "/"));
         }
     }
 
@@ -248,6 +254,15 @@ mod tests {
     }
 
     #[test]
+    fn test_file_names_for_nested_files() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("nested/config")).unwrap();
+        fs::write(dir.path().join("nested/config/app.toml"), "").unwrap();
+        let names = file_names_for_dir(dir.path()).unwrap();
+        assert!(names.contains("nested/config/app.toml"));
+    }
+
+    #[test]
     fn test_file_names_for_file() {
         let dir = tempdir().unwrap();
         let file = dir.path().join("standalone.txt");
@@ -306,5 +321,26 @@ mod tests {
             true,
         );
         assert!(found.is_ok());
+    }
+
+    #[test]
+    fn test_resolve_name_dir() {
+        let root = tempdir().unwrap();
+        let dir = root.path().join("my-profile");
+        fs::create_dir(&dir).unwrap();
+        assert_eq!(resolve_name(&dir, Entity::Profile).unwrap(), "my-profile");
+    }
+
+    #[test]
+    fn test_resolve_name_file_stem() {
+        let root = tempdir().unwrap();
+        let file = root.path().join("build.sh");
+        fs::write(&file, "").unwrap();
+        assert_eq!(resolve_name(&file, Entity::Command).unwrap(), "build");
+    }
+
+    #[test]
+    fn test_resolve_name_nonexistent() {
+        assert!(resolve_name(Path::new("/nonexistent/xx"), Entity::Module).is_err());
     }
 }

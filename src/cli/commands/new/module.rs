@@ -46,9 +46,7 @@ pub fn new_module(client: &MoldXClient, args: Vec<String>) -> Result<()> {
 
     if let Some(profile_name) = profile_name {
         let profile = client
-            .profiles
-            .iter()
-            .find(|p| p.name == profile_name)
+            .find_profile(&profile_name)
             .ok_or(MoldXError2::ProfileNotFound { name: profile_name })?;
         let template = select_template(profile, template_name.as_deref())?;
         scaffold_template_dir(&template.path, &module_path)?;

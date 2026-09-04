@@ -36,8 +36,9 @@ impl MoldXClient {
     ///
     /// Returns an error if profiles or modules cannot be loaded.
     pub fn new(config: MoldXConfig) -> Result<Self> {
+        let root_profile = Profile::root(&config.moldx_dir, &config)?;
         let mut client = Self {
-            profiles: Profile::resolve_profiles(&config.profiles_dir, &config)?,
+            profiles: vec![root_profile],
             modules: vec![],
             config,
             executor: Executor::new(),
@@ -86,7 +87,7 @@ impl MoldXClient {
                 continue;
             }
 
-            if let Ok(module) = Module::resolve(path, &self.profiles)
+            if let Ok(module) = Module::resolve(path, self.profile_children())
                 && !module.profiles.is_empty()
             {
                 self.modules.push(module);
@@ -138,7 +139,7 @@ impl MoldXClient {
                 continue;
             }
 
-            if let Ok(module) = Module::resolve(path, &self.profiles)
+            if let Ok(module) = Module::resolve(path, self.profile_children())
                 && !module.profiles.is_empty()
             {
                 modules.push(module);
@@ -160,7 +161,7 @@ impl MoldXClient {
     ///
     /// References to the matching profiles.
     pub fn profiles_for_module(&self, module_path: &std::path::Path) -> Vec<&Profile> {
-        self.profiles
+        self.profile_children()
             .iter()
             .filter(|p| p.template.matches(module_path))
             .collect()
@@ -173,12 +174,33 @@ impl MoldXClient {
         profile_names: &[String],
     ) -> Vec<Command> {
         let mut discovered = Vec::new();
-
-        self.profiles.iter().for_each(|p| {
-            p.commands_for_module(command_name, module_path, &mut discovered, profile_names);
-        });
+        self.profiles[0].commands_for_module(
+            command_name,
+            module_path,
+            &mut discovered,
+            profile_names,
+        );
 
         discovered
+    }
+
+    pub fn profile_children(&self) -> &[Profile] {
+        self.profiles
+            .first()
+            .map(|root| root.profiles.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn find_profile(&self, name: &str) -> Option<&Profile> {
+        fn find<'a>(profiles: &'a [Profile], name: &str) -> Option<&'a Profile> {
+            profiles.iter().find_map(|profile| {
+                (profile.name == name)
+                    .then_some(profile)
+                    .or_else(|| find(&profile.profiles, name))
+            })
+        }
+
+        find(self.profile_children(), name)
     }
 
     /// Placeholder for future command-handler dispatch logic.
@@ -195,13 +217,19 @@ impl MoldXClient {
 /// Prints the configuration, executor status, profiles, and modules.
 impl Display for MoldXClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.config)?;
-        writeln!(f, "{}", self.executor)?;
-        writeln!(f, "{} {}", "profiles:".bold().yellow(), self.profiles.len())?;
-        for profile in &self.profiles {
-            writeln!(f, "  {}", profile.name.bold().green())?;
+        fn profile_count(profile: &Profile) -> usize {
+            1 + profile.profiles.iter().map(profile_count).sum::<usize>()
+        }
+
+        fn write_profile(
+            f: &mut fmt::Formatter<'_>,
+            profile: &Profile,
+            indent: usize,
+        ) -> fmt::Result {
+            let padding = "  ".repeat(indent);
+            writeln!(f, "{}{}", padding, profile.name.bold().green())?;
             if profile.template.file_names.is_empty() {
-                writeln!(f, "    template: empty")?;
+                writeln!(f, "{}  template: empty", padding)?;
             } else {
                 let template_names = profile
                     .template
@@ -210,24 +238,185 @@ impl Display for MoldXClient {
                     .cloned()
                     .collect::<Vec<_>>()
                     .join(", ");
-                writeln!(f, "    template: {}", template_names)?;
+                writeln!(f, "{}  template: {}", padding, template_names)?;
             }
             if profile.commands.is_empty() {
-                writeln!(f, "    commands: none")?;
+                writeln!(f, "{}  commands: none", padding)?;
             } else {
                 let commands = profile
                     .commands
                     .iter()
-                    .map(|c| c.name.clone())
+                    .map(|command| command.name.clone())
                     .collect::<Vec<_>>()
                     .join(", ");
-                writeln!(f, "    commands: {}", commands)?;
+                writeln!(f, "{}  commands: {}", padding, commands)?;
             }
+            for child in &profile.profiles {
+                write_profile(f, child, indent + 1)?;
+            }
+            Ok(())
+        }
+
+        writeln!(f, "{}", self.config)?;
+        writeln!(f, "{}", self.executor)?;
+        if !self.profiles[0].commands.is_empty() {
+            writeln!(f, "{}", "root commands:".bold().yellow())?;
+            for command in &self.profiles[0].commands {
+                writeln!(f, "  {}", command)?;
+            }
+        }
+        let profile_total = self.profiles.first().map(profile_count).unwrap_or(0);
+        writeln!(f, "{} {}", "profiles:".bold().yellow(), profile_total)?;
+        for profile in &self.profiles {
+            write_profile(f, profile, 1)?;
         }
         writeln!(f, "{} {}", "modules:".bold().yellow(), self.modules.len())?;
         for module in &self.modules {
             writeln!(f, "  {}", module)?;
         }
         Ok(())
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn write_command(profile_dir: &std::path::Path, name: &str) {
+        let bin = profile_dir.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join(format!("{}.sh", name)), "#!/usr/bin/env bash\nexit 0").unwrap();
+    }
+
+    fn make_profile_dir(root: &std::path::Path, name: &str, files: &[&str]) {
+        let profile = root.join(name);
+        fs::create_dir_all(profile.join("bin")).unwrap();
+        let template = profile.join("template");
+        fs::create_dir_all(&template).unwrap();
+        for f in files {
+            fs::write(template.join(f), "").unwrap();
+        }
+        // ensure at least one file so the template is not an empty catch-all
+        // unless explicitly requested with no files
+        fs::write(template.join(".keep"), "").unwrap();
+    }
+
+    fn make_client(dir: &std::path::Path) -> MoldXClient {
+        let profile_root = dir.join(".moldx/profiles");
+        fs::create_dir_all(&profile_root).unwrap();
+
+        make_profile_dir(&profile_root, "docker", &["Dockerfile"]);
+        write_command(&profile_root.join("docker"), "build");
+        make_profile_dir(&profile_root, "node", &["package.json"]);
+        write_command(&profile_root.join("node"), "test");
+
+        let config = crate::config::MoldXConfig {
+            moldx_dir: dir.join(".moldx"),
+            profiles_dir: profile_root,
+            profiles_dir_name: "profiles".into(),
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        MoldXClient::new(config).unwrap()
+    }
+
+    #[test]
+    fn test_load_modules_discovers_matching_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let module_dir = dir.path().join("services").join("api");
+        fs::create_dir_all(&module_dir).unwrap();
+        fs::write(module_dir.join("Dockerfile"), "").unwrap();
+        let non_module = dir.path().join("services").join("plain");
+        fs::create_dir_all(&non_module).unwrap();
+
+        let client = make_client(dir.path());
+        let names: Vec<String> = client
+            .modules
+            .iter()
+            .map(|m| m.path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"api".to_string()));
+        assert!(!names.contains(&"plain".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_modules_matches_load_modules() {
+        let dir = tempfile::tempdir().unwrap();
+        let module_dir = dir.path().join("worker");
+        fs::create_dir_all(&module_dir).unwrap();
+        fs::write(module_dir.join("package.json"), "").unwrap();
+
+        let client = make_client(dir.path());
+        let resolved = client.resolve_modules().unwrap();
+        assert_eq!(resolved.len(), client.modules.len());
+        assert!(resolved
+            .iter()
+            .any(|m| m.path == module_dir.canonicalize().unwrap()));
+    }
+
+    #[test]
+    fn test_profiles_for_module_matches_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let docker_module = dir.path().join("svc");
+        fs::create_dir_all(&docker_module).unwrap();
+        fs::write(docker_module.join("Dockerfile"), "").unwrap();
+
+        let client = make_client(dir.path());
+        let profiles = client.profiles_for_module(&docker_module);
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].name, "docker");
+    }
+
+    #[test]
+    fn test_profiles_for_module_no_match() {
+        let dir = tempfile::tempdir().unwrap();
+        let empty_module = dir.path().join("empty");
+        fs::create_dir_all(&empty_module).unwrap();
+
+        let client = make_client(dir.path());
+        let profiles = client.profiles_for_module(&empty_module);
+        assert!(profiles.is_empty());
+    }
+
+    #[test]
+    fn test_commands_for_module_resolves() {
+        let dir = tempfile::tempdir().unwrap();
+        let docker_module = dir.path().join("svc");
+        fs::create_dir_all(&docker_module).unwrap();
+        fs::write(docker_module.join("Dockerfile"), "").unwrap();
+
+        let client = make_client(dir.path());
+        let commands = client.commands_for_module("build", &docker_module, &[]);
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].name, "build");
+    }
+
+    #[test]
+    fn test_commands_for_module_with_profile_filter() {
+        let dir = tempfile::tempdir().unwrap();
+        let docker_module = dir.path().join("svc");
+        fs::create_dir_all(&docker_module).unwrap();
+        fs::write(docker_module.join("Dockerfile"), "").unwrap();
+
+        let client = make_client(dir.path());
+        let commands = client.commands_for_module("build", &docker_module, &["node".into()]);
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn test_commands_for_module_unknown_command() {
+        let dir = tempfile::tempdir().unwrap();
+        let docker_module = dir.path().join("svc");
+        fs::create_dir_all(&docker_module).unwrap();
+        fs::write(docker_module.join("Dockerfile"), "").unwrap();
+
+        let client = make_client(dir.path());
+        let commands = client.commands_for_module("nope", &docker_module, &[]);
+        assert!(commands.is_empty());
     }
 }

@@ -162,7 +162,7 @@ impl TuiApp {
         if let Some(m) = self.modules.get(self.module_idx) {
             let mut resolved: Vec<(&str, &Command)> = Vec::new();
             for &profile_index in &m.profiles {
-                if let Some(profile) = self.client.profiles.get(profile_index) {
+                if let Some(profile) = self.client.profile_children().get(profile_index) {
                     for command in &profile.commands {
                         resolved.push((&profile.name, command));
                     }
@@ -494,7 +494,12 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
                 let mut names: Vec<&str> = m
                     .profiles
                     .iter()
-                    .filter_map(|&idx| app.client.profiles.get(idx).map(|p| p.name.as_str()))
+                    .filter_map(|&idx| {
+                        app.client
+                            .profile_children()
+                            .get(idx)
+                            .map(|p| p.name.as_str())
+                    })
                     .collect();
                 names.sort();
                 names.join(", ")
@@ -786,4 +791,82 @@ pub async fn run(client: &MoldXClient) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn test_client() -> Arc<MoldXClient> {
+        let dir = tempdir().unwrap();
+        let moldx_dir = dir.path().join(".moldx");
+        let profile_dir = moldx_dir.join("profiles/docker");
+        fs::create_dir_all(profile_dir.join("template")).unwrap();
+        fs::create_dir_all(profile_dir.join("bin")).unwrap();
+        fs::write(profile_dir.join("template/Dockerfile"), "").unwrap();
+        fs::write(
+            profile_dir.join("bin/build.sh"),
+            "#!/usr/bin/env bash\nexit 0\n",
+        )
+        .unwrap();
+
+        let module_dir = dir.path().join("service");
+        fs::create_dir_all(&module_dir).unwrap();
+        fs::write(module_dir.join("Dockerfile"), "").unwrap();
+
+        let config = crate::config::MoldXConfig {
+            moldx_dir,
+            profiles_dir: dir.path().join(".moldx/profiles"),
+            profiles_dir_name: "profiles".into(),
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: dir.path().to_path_buf(),
+            max_resolution_depth: 20,
+        };
+        Arc::new(MoldXClient::new(config).unwrap())
+    }
+
+    #[test]
+    fn panel_navigation_wraps() {
+        assert_eq!(Panel::Modules.next(), Panel::Commands);
+        assert_eq!(Panel::Commands.next(), Panel::Running);
+        assert_eq!(Panel::Running.next(), Panel::Modules);
+        assert_eq!(Panel::Modules.prev(), Panel::Running);
+        assert_eq!(Panel::Running.prev(), Panel::Commands);
+    }
+
+    #[test]
+    fn app_rebuilds_commands_and_handles_navigation() {
+        let client = test_client();
+        let mut app = TuiApp::new(client);
+        assert_eq!(app.modules.len(), 1);
+        assert_eq!(app.command_items.len(), 1);
+        assert_eq!(app.command_items[0].profile, "docker");
+
+        app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+        assert_eq!(app.active_panel, Panel::Commands);
+        app.handle_key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::NONE));
+        assert_eq!(app.active_panel, Panel::Modules);
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+        assert_eq!(app.module_idx, 0);
+        assert!(!app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)));
+        assert!(app.handle_key(KeyEvent::new(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL,
+        )));
+    }
+
+    #[test]
+    fn app_renders_with_test_backend() {
+        let client = test_client();
+        let mut app = TuiApp::new(client);
+        let backend = ratatui::backend::TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(buffer.content().iter().any(|cell| cell.symbol() == "M"));
+    }
 }

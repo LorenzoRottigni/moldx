@@ -47,6 +47,12 @@ pub mod types;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
+    // Scaffolding commands (init/new) may create `.moldx` and therefore must
+    // not fail when the directory does not yet exist.
+    let create_if_missing = matches!(
+        &cli.command,
+        Some(cli::Command::Init { .. }) | Some(cli::Command::New { .. })
+    );
     let config = config::MoldXConfig::new(
         cli.moldx_dir.clone(),
         cli.profiles_dir_name.clone(),
@@ -55,9 +61,9 @@ async fn main() -> Result<()> {
         cli.templates_dir_name.clone(),
         cli.max_resolution_depth,
         cli.modules_dir.clone(),
+        create_if_missing,
     )?;
     let client = client::MoldXClient::new(config)?;
-    print!("{}", client);
     cli.exec_with(&client).await?;
     Ok(())
 }

@@ -19,6 +19,33 @@ pub struct Profile {
 }
 
 impl Profile {
+    /// Builds the root profile represented by `.moldx`.
+    ///
+    /// The root profile owns commands from `.moldx/bin` and contains the
+    /// technology profiles loaded from `.moldx/profiles`.
+    pub fn root(path: &Path, config: &MoldXConfig) -> Result<Self> {
+        let bin_dir = path.join(&config.bin_dir_name);
+        let commands = if bin_dir.is_dir() {
+            Command::resolve_commands(&bin_dir)?
+        } else {
+            Vec::new()
+        };
+        let profiles = Self::resolve_profiles(&config.profiles_dir, config)?;
+
+        let profile = Self {
+            name: "root".to_string(),
+            path: path.to_path_buf(),
+            template: Template {
+                path: path.to_path_buf(),
+                file_names: Default::default(),
+            },
+            commands,
+            profiles,
+        };
+        profile.validate_children()?;
+        Ok(profile)
+    }
+
     /// Loads a profile from a directory.
     ///
     /// Reads the profile's template, commands, and nested child profiles,
@@ -198,5 +225,171 @@ impl Profile {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn make_config() -> MoldXConfig {
+        MoldXConfig {
+            moldx_dir: PathBuf::from("/nonexistent/.moldx"),
+            profiles_dir: PathBuf::from("/nonexistent/.moldx/profiles"),
+            profiles_dir_name: "profiles".into(),
+            bin_dir_name: "bin".into(),
+            template_dir_name: "template".into(),
+            templates_dir_name: "templates".into(),
+            modules_dir: PathBuf::from("/nonexistent"),
+            max_resolution_depth: 20,
+        }
+    }
+
+    fn write(profile_dir: &Path, files: &[&str], commands: &[&str]) {
+        let bin = profile_dir.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        for c in commands {
+            fs::write(bin.join(format!("{}.sh", c)), "#!/usr/bin/env bash\nexit 0").unwrap();
+        }
+        let template = profile_dir.join("template");
+        fs::create_dir_all(&template).unwrap();
+        for f in files {
+            fs::write(template.join(f), "").unwrap();
+        }
+    }
+
+    #[test]
+    fn test_get_command_local() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("docker");
+        write(&pdir, &["Dockerfile"], &["build", "test"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+        assert_eq!(profile.get_command(&"build".to_string()).unwrap().name, "build");
+    }
+
+    #[test]
+    fn test_get_command_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("docker");
+        write(&pdir, &["Dockerfile"], &["build"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+        assert!(profile.get_command(&"nope".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_get_command_searches_children() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("node");
+        write(&pdir, &["package.json"], &[]);
+        let nuxt = pdir.join("profiles").join("nuxt");
+        write(&nuxt, &["package.json", "nuxt.config.ts"], &["dev"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+        assert_eq!(profile.get_command(&"dev".to_string()).unwrap().name, "dev");
+    }
+
+    #[test]
+    fn test_commands_for_module_resolves_local() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("docker");
+        write(&pdir, &["Dockerfile"], &["build"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+
+        let module = dir.path().join("svc");
+        fs::create_dir(&module).unwrap();
+        fs::write(module.join("Dockerfile"), "").unwrap();
+
+        let mut found = Vec::new();
+        profile.commands_for_module("build", &module, &mut found, &[]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "build");
+    }
+
+    #[test]
+    fn test_commands_for_module_ignores_non_matching_module() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("docker");
+        write(&pdir, &["Dockerfile"], &["build"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+
+        let module = dir.path().join("svc");
+        fs::create_dir(&module).unwrap();
+
+        let mut found = Vec::new();
+        profile.commands_for_module("build", &module, &mut found, &[]);
+        assert!(found.is_empty());
+    }
+
+    #[test]
+    fn test_commands_for_module_filters_by_profile_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("docker");
+        write(&pdir, &["Dockerfile"], &["build"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+
+        let module = dir.path().join("svc");
+        fs::create_dir(&module).unwrap();
+        fs::write(module.join("Dockerfile"), "").unwrap();
+
+        let mut found = Vec::new();
+        profile.commands_for_module("build", &module, &mut found, &["other".into()]);
+        assert!(found.is_empty());
+
+        let mut found = Vec::new();
+        profile.commands_for_module("build", &module, &mut found, &["docker".into()]);
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn test_commands_for_module_recurses_into_children() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("node");
+        write(&pdir, &["package.json"], &[]);
+        let nuxt = pdir.join("profiles").join("nuxt");
+        write(&nuxt, &["package.json", "nuxt.config.ts"], &["dev", "start"]);
+        let profile = Profile::new(&pdir, &make_config()).unwrap();
+
+        let module = dir.path().join("app");
+        fs::create_dir(&module).unwrap();
+        fs::write(module.join("package.json"), "").unwrap();
+        fs::write(module.join("nuxt.config.ts"), "").unwrap();
+
+        let mut found = Vec::new();
+        profile.commands_for_module("dev", &module, &mut found, &[]);
+        assert_eq!(found.len(), 1);
+
+        let mut found = Vec::new();
+        profile.commands_for_module("dev", &module, &mut found, &["nuxt".into()]);
+        assert_eq!(found.len(), 1);
+
+        let mut found = Vec::new();
+        profile.commands_for_module("start", &module, &mut found, &["other".into()]);
+        assert!(found.is_empty());
+    }
+
+    #[test]
+    fn test_validate_children_rejects_non_superset() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdir = dir.path().join("node");
+        // parent matches package.json
+        write(&pdir, &["package.json"], &[]);
+        let nuxt = pdir.join("profiles").join("nuxt");
+        // child missing package.json -> not a superset -> invalid
+        write(&nuxt, &["nuxt.config.ts"], &["dev"]);
+        let result = Profile::new(&pdir, &make_config());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_child_of() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent = dir.path().join("node");
+        write(&parent, &["package.json"], &[]);
+        let child = dir.path().join("nuxt");
+        write(&child, &["package.json", "nuxt.config.ts"], &[]);
+        let p = Profile::new(&parent, &make_config()).unwrap();
+        let c = Profile::new(&child, &make_config()).unwrap();
+        assert!(c.is_child_of(&p));
+        assert!(!p.is_child_of(&c));
     }
 }

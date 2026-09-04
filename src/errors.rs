@@ -109,6 +109,18 @@ pub enum MoldXError2 {
     #[error("[MoldX Error] Process exited with non-zero status code: {code}")]
     ProcessNonZeroExit { code: i32 },
 
+    #[error("[MoldX Error] Usage: moldx init profile <profile...>")]
+    InitProfileUsage,
+
+    #[error("[MoldX Error] Usage: moldx init command [profile...] <command>")]
+    InitCommandUsage,
+
+    #[error("[MoldX Error] Usage: moldx init template [profile...] [file...]")]
+    InitTemplateUsage,
+
+    #[error("[MoldX Error] Unknown init entity: {entity}")]
+    UnknownInitEntity { entity: String },
+
     #[error("[MoldX Error] io error: {0}")]
     Io(#[from] std::io::Error),
 

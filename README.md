@@ -455,7 +455,7 @@ MoldX includes a playground for local experimentation.
 When running MoldX locally:
 
 ```bash
-cargo run -- list
+cargo run -- status
 ```
 
 MoldX automatically resolves the playground's `.moldx` directory, making it possible to test profiles, templates, commands, and module resolution without modifying the development environment itself.

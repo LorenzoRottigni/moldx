@@ -7,8 +7,8 @@ use crate::client::MoldXClient;
 use crate::constants::DEFAULT_BIN_DIR_NAME;
 use crate::constants::DEFAULT_MAX_RESOLUTION_DEPTH;
 use crate::constants::DEFAULT_PROFILES_DIR_NAME;
-use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::DEFAULT_TEMPLATE_DIR_NAME;
+use crate::constants::DEFAULT_TEMPLATES_DIR_NAME;
 use crate::constants::MOLDX_DIR_NAME;
 
 /// Subcommand handler modules.
@@ -121,7 +121,8 @@ pub enum Command {
         path: PathBuf,
     },
 
-    Status,
+    /// List resolved profiles, commands, templates, and modules.
+    List,
 
     /// Create or initialize a MoldX project structure.
     /// Supported forms: `moldx init`, `moldx init profile ...`,
@@ -134,13 +135,6 @@ pub enum Command {
     /// Run a command: moldx [profile...] <command> <path> [-- <command options...>]
     #[command(external_subcommand)]
     Run(Vec<String>),
-
-    /// Scaffold new MoldX entities (profile, module, command)
-    New {
-        /// Arguments: either `<command>` or `<profile> <command>`
-        #[arg(required = true, num_args = 1..=3)]
-        args: Vec<String>,
-    },
 }
 
 /// Dispatch logic for each variant.
@@ -153,9 +147,8 @@ impl Command {
             }
             Self::Ui => commands::ui::ui(client).await,
             Self::Detect { path } => commands::detect::detect(client, path).await,
-            Self::Status => commands::status::status(client).await,
+            Self::List => commands::list::list(client).await,
             Self::Init { args } => commands::init::init(client, args).await,
-            Self::New { args } => commands::new::new(client, args).await,
             Self::Run(args) => commands::run::run(client, args, skip_conflicts).await,
         }
     }

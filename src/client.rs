@@ -1,7 +1,7 @@
-use crate::{command::Command, config::MoldXConfig};
 use crate::executor::Executor;
 use crate::module::Module;
 use crate::profile::Profile;
+use crate::{command::Command, config::MoldXConfig};
 
 use anyhow::Result;
 use owo_colors::OwoColorize;
@@ -45,6 +45,17 @@ impl MoldXClient {
         };
         client.load_modules()?;
         Ok(client)
+    }
+
+    /// Builds a client for filesystem scaffolding without scanning modules.
+    pub fn new_for_scaffolding(config: MoldXConfig) -> Result<Self> {
+        let root_profile = Profile::root(&config.moldx_dir, &config)?;
+        Ok(Self {
+            profiles: vec![root_profile],
+            modules: Vec::new(),
+            config,
+            executor: Executor::new(),
+        })
     }
 
     /// Walks the modules directory and populates `self.modules`.
@@ -276,7 +287,6 @@ impl Display for MoldXClient {
         }
         Ok(())
     }
-
 }
 
 #[cfg(test)]
@@ -287,7 +297,11 @@ mod tests {
     fn write_command(profile_dir: &std::path::Path, name: &str) {
         let bin = profile_dir.join("bin");
         fs::create_dir_all(&bin).unwrap();
-        fs::write(bin.join(format!("{}.sh", name)), "#!/usr/bin/env bash\nexit 0").unwrap();
+        fs::write(
+            bin.join(format!("{}.sh", name)),
+            "#!/usr/bin/env bash\nexit 0",
+        )
+        .unwrap();
     }
 
     fn make_profile_dir(root: &std::path::Path, name: &str, files: &[&str]) {
@@ -354,9 +368,11 @@ mod tests {
         let client = make_client(dir.path());
         let resolved = client.resolve_modules().unwrap();
         assert_eq!(resolved.len(), client.modules.len());
-        assert!(resolved
-            .iter()
-            .any(|m| m.path == module_dir.canonicalize().unwrap()));
+        assert!(
+            resolved
+                .iter()
+                .any(|m| m.path == module_dir.canonicalize().unwrap())
+        );
     }
 
     #[test]

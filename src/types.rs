@@ -1,7 +1,7 @@
-use std::str::FromStr;
-use std::fmt;
-use anyhow::Result;
 use crate::errors::MoldXError2;
+use anyhow::Result;
+use std::fmt;
+use std::str::FromStr;
 
 /// The kinds of entities managed by MoldX.
 ///
@@ -57,7 +57,9 @@ impl FromStr for Entity {
             "module" => Ok(Entity::Module),
             "command" => Ok(Entity::Command),
             "profile" => Ok(Entity::Profile),
-            _ => Err(MoldXError2::UnknownEntity { entity: value.to_string() }),
+            _ => Err(MoldXError2::UnknownEntity {
+                entity: value.to_string(),
+            }),
         }
     }
 }
@@ -87,10 +89,22 @@ mod tests {
 
     #[test]
     fn test_from_str_valid() {
-        assert!(matches!("template".parse::<Entity>().unwrap(), Entity::Template));
-        assert!(matches!("module".parse::<Entity>().unwrap(), Entity::Module));
-        assert!(matches!("command".parse::<Entity>().unwrap(), Entity::Command));
-        assert!(matches!("profile".parse::<Entity>().unwrap(), Entity::Profile));
+        assert!(matches!(
+            "template".parse::<Entity>().unwrap(),
+            Entity::Template
+        ));
+        assert!(matches!(
+            "module".parse::<Entity>().unwrap(),
+            Entity::Module
+        ));
+        assert!(matches!(
+            "command".parse::<Entity>().unwrap(),
+            Entity::Command
+        ));
+        assert!(matches!(
+            "profile".parse::<Entity>().unwrap(),
+            Entity::Profile
+        ));
     }
 
     #[test]

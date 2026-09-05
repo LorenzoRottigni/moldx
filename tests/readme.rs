@@ -80,12 +80,16 @@ fn init_profile_command_and_template() {
         .args(["init", "profile", "node", "nuxt"])
         .assert()
         .success();
-    assert!(moldx_dir
-        .join("profiles/node/profiles/nuxt/bin/.keep")
-        .exists());
-    assert!(moldx_dir
-        .join("profiles/node/profiles/nuxt/template/.keep")
-        .exists());
+    assert!(
+        moldx_dir
+            .join("profiles/node/profiles/nuxt/bin/.keep")
+            .exists()
+    );
+    assert!(
+        moldx_dir
+            .join("profiles/node/profiles/nuxt/template/.keep")
+            .exists()
+    );
 
     Command::cargo_bin("moldx")
         .unwrap()
@@ -94,9 +98,11 @@ fn init_profile_command_and_template() {
         .args(["init", "command", "node", "nuxt", "dev"])
         .assert()
         .success();
-    assert!(moldx_dir
-        .join("profiles/node/profiles/nuxt/bin/dev.sh")
-        .exists());
+    assert!(
+        moldx_dir
+            .join("profiles/node/profiles/nuxt/bin/dev.sh")
+            .exists()
+    );
 
     Command::cargo_bin("moldx")
         .unwrap()
@@ -112,12 +118,16 @@ fn init_profile_command_and_template() {
         ])
         .assert()
         .success();
-    assert!(moldx_dir
-        .join("profiles/node/profiles/nuxt/template/nuxt.config.ts")
-        .exists());
-    assert!(moldx_dir
-        .join("profiles/node/profiles/nuxt/template/package.json")
-        .exists());
+    assert!(
+        moldx_dir
+            .join("profiles/node/profiles/nuxt/template/nuxt.config.ts")
+            .exists()
+    );
+    assert!(
+        moldx_dir
+            .join("profiles/node/profiles/nuxt/template/package.json")
+            .exists()
+    );
 }
 
 #[test]
@@ -200,25 +210,21 @@ fn command_options_forwarded_after_double_dash() {
     fs::write(tmp.path().join("mod/package.json"), "{}").unwrap();
 
     let moldx_dir = tmp.path().join(".moldx");
-    cmd_in(
-        &tmp,
-        &moldx_dir,
-        &["mycmd", "mod", "--", "--flag", "value"],
-    )
-    .assert()
-    .success()
-    .stdout(contains("--flag"))
-    .stdout(contains("value"));
+    cmd_in(&tmp, &moldx_dir, &["mycmd", "mod", "--", "--flag", "value"])
+        .assert()
+        .success()
+        .stdout(contains("--flag"))
+        .stdout(contains("value"));
 }
 
-// ── status ───────────────────────────────────────────────────────────────────
+// ── list ─────────────────────────────────────────────────────────────────────
 
 #[test]
-fn status_reports_profiles_and_modules() {
+fn list_reports_profiles_and_modules() {
     let tmp = scaffold_project();
     let moldx_dir = tmp.path().join(".moldx");
 
-    cmd_in(&tmp, &moldx_dir, &["status"])
+    cmd_in(&tmp, &moldx_dir, &["list"])
         .assert()
         .success()
         .stdout(contains("profiles:"))

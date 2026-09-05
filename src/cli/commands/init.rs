@@ -25,9 +25,9 @@ fn profile_parts_for_template(client: &MoldXClient, args: &[String]) -> (Vec<Str
         let Some((head, tail)) = parts.split_first() else {
             return true;
         };
-        profiles.iter().any(|profile| {
-            profile.name == *head && profile_exists(&profile.profiles, tail)
-        })
+        profiles
+            .iter()
+            .any(|profile| profile.name == *head && profile_exists(&profile.profiles, tail))
     }
 
     let mut best = 0;
@@ -223,11 +223,7 @@ fn init_template(client: &MoldXClient, sub: &[String]) -> Result<()> {
         let path = template_dir.join(&file);
         fs::create_dir_all(path.parent().expect("template file has a parent"))?;
         fs::write(&path, "")?;
-        println!(
-            "Created template file {} at {}",
-            file,
-            path.display()
-        );
+        println!("Created template file {} at {}", file, path.display());
     }
     if fs::read_dir(&template_dir)?.next().is_none() {
         fs::write(template_dir.join(".keep"), "")?;
@@ -265,8 +261,16 @@ mod tests {
         assert!(result.is_ok());
         assert!(dir.path().join(".moldx/bin/.keep").exists());
         assert!(dir.path().join(".moldx/profiles/.keep").exists());
-        assert!(dir.path().join(".moldx/profiles/default/bin/.keep").exists());
-        assert!(dir.path().join(".moldx/profiles/default/template/.keep").exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/default/bin/.keep")
+                .exists()
+        );
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/default/template/.keep")
+                .exists()
+        );
         assert!(dir.path().join(".moldx/README.md").exists());
         let readme = fs::read_to_string(dir.path().join(".moldx/README.md")).unwrap();
         assert_eq!(readme, "# .moldx");
@@ -310,7 +314,11 @@ mod tests {
         let result = init(&client, vec!["profile".into(), "docker".into()]).await;
         assert!(result.is_ok());
         assert!(dir.path().join(".moldx/profiles/docker/bin/.keep").exists());
-        assert!(dir.path().join(".moldx/profiles/docker/template/.keep").exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/docker/template/.keep")
+                .exists()
+        );
     }
 
     #[tokio::test]
@@ -323,8 +331,16 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/profiles/node/profiles/nuxt/bin/.keep").exists());
-        assert!(dir.path().join(".moldx/profiles/node/profiles/nuxt/template/.keep").exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/node/profiles/nuxt/bin/.keep")
+                .exists()
+        );
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/node/profiles/nuxt/template/.keep")
+                .exists()
+        );
     }
 
     #[tokio::test]
@@ -365,7 +381,9 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
-        let script = dir.path().join(".moldx/profiles/node/profiles/nuxt/bin/dev.sh");
+        let script = dir
+            .path()
+            .join(".moldx/profiles/node/profiles/nuxt/bin/dev.sh");
         assert!(script.exists());
     }
 
@@ -400,7 +418,11 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/profiles/docker/template/Dockerfile").exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/docker/template/Dockerfile")
+                .exists()
+        );
     }
 
     #[tokio::test]
@@ -427,10 +449,11 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
-        assert!(dir
-            .path()
-            .join(".moldx/profiles/node/profiles/nuxt/template/nuxt.config.ts")
-            .exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/node/profiles/nuxt/template/nuxt.config.ts")
+                .exists()
+        );
     }
 
     #[tokio::test]
@@ -439,7 +462,11 @@ mod tests {
         let client = make_client(dir.path());
         let result = init(&client, vec!["template".into(), "package.json".into()]).await;
         assert!(result.is_ok());
-        assert!(dir.path().join(".moldx/profiles/default/template/package.json").exists());
+        assert!(
+            dir.path()
+                .join(".moldx/profiles/default/template/package.json")
+                .exists()
+        );
     }
 
     #[tokio::test]

@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 
-use crate::errors::{MoldXError2};
-use crate::fs::{file_names_for_dir};
+use crate::errors::MoldXError2;
+use crate::fs::file_names_for_dir;
 
 /// Defines the files used to identify modules and profiles.
 ///

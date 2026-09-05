@@ -1,5 +1,10 @@
 use crate::{
-    command::Command, config::MoldXConfig, errors::{MoldXError2}, fs::{resolve_name, sorted_read_dir}, template::Template, types::Entity,
+    command::Command,
+    config::MoldXConfig,
+    errors::MoldXError2,
+    fs::{resolve_name, sorted_read_dir},
+    template::Template,
+    types::Entity,
 };
 use anyhow::{Result, bail};
 use std::path::{Path, PathBuf};
@@ -108,10 +113,7 @@ impl Profile {
     /// # Errors
     ///
     /// Returns an error if a profile directory cannot be read or loaded.
-    pub fn resolve_profiles(
-        source: &Path,
-        config: &MoldXConfig,
-    ) -> Result<Vec<Self>> {
+    pub fn resolve_profiles(source: &Path, config: &MoldXConfig) -> Result<Vec<Self>> {
         if !source.is_dir() {
             return Ok(vec![]);
         }
@@ -265,7 +267,10 @@ mod tests {
         let pdir = dir.path().join("docker");
         write(&pdir, &["Dockerfile"], &["build", "test"]);
         let profile = Profile::new(&pdir, &make_config()).unwrap();
-        assert_eq!(profile.get_command(&"build".to_string()).unwrap().name, "build");
+        assert_eq!(
+            profile.get_command(&"build".to_string()).unwrap().name,
+            "build"
+        );
     }
 
     #[test]
@@ -346,7 +351,11 @@ mod tests {
         let pdir = dir.path().join("node");
         write(&pdir, &["package.json"], &[]);
         let nuxt = pdir.join("profiles").join("nuxt");
-        write(&nuxt, &["package.json", "nuxt.config.ts"], &["dev", "start"]);
+        write(
+            &nuxt,
+            &["package.json", "nuxt.config.ts"],
+            &["dev", "start"],
+        );
         let profile = Profile::new(&pdir, &make_config()).unwrap();
 
         let module = dir.path().join("app");

@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-use std::fmt::{self, Display};
-use owo_colors::OwoColorize;
 use anyhow::{Result, bail};
+use owo_colors::OwoColorize;
+use std::fmt::{self, Display};
+use std::path::PathBuf;
 
-use crate::errors::{MoldXError2};
+use crate::errors::MoldXError2;
 use crate::fs::resolve_name;
 use crate::profile::Profile;
 use crate::types::Entity;
@@ -46,7 +46,7 @@ impl Module {
         Ok(Self {
             name: resolve_name(&path, Entity::Module)?,
             path,
-            profiles
+            profiles,
         })
     }
 
@@ -116,8 +116,8 @@ impl Display for Module {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_module_new_valid() {

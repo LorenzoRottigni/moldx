@@ -23,14 +23,8 @@ struct RunArgs {
 impl RunArgs {
     fn parse(client: &MoldXClient, args: Vec<String>) -> Result<Self> {
         let mut split_on_dash = args.split(|a| a == "--");
-        let mut before = split_on_dash
-            .next()
-            .map(|v| v.to_vec())
-            .unwrap_or_default();
-        let options = split_on_dash
-            .next()
-            .map(|v| v.to_vec())
-            .unwrap_or_default();
+        let mut before = split_on_dash.next().map(|v| v.to_vec()).unwrap_or_default();
+        let options = split_on_dash.next().map(|v| v.to_vec()).unwrap_or_default();
 
         // Remove the `--` marker itself if it leaked into `before`.
         before.retain(|a| a != "--");
@@ -91,10 +85,7 @@ fn expand_modules(client: &MoldXClient, spec: &str) -> Vec<PathBuf> {
         return vec![pattern.to_path_buf()];
     }
 
-    let pattern_segments: Vec<&str> = pattern_str
-        .split('/')
-        .filter(|s| !s.is_empty())
-        .collect();
+    let pattern_segments: Vec<&str> = pattern_str.split('/').filter(|s| !s.is_empty()).collect();
 
     // A pattern like `packages/**` should also match the top-level module.
     let mut matched = Vec::new();
@@ -105,10 +96,7 @@ fn expand_modules(client: &MoldXClient, spec: &str) -> Vec<PathBuf> {
             Err(_) => continue,
         };
         let rel_str = rel.to_string_lossy().into_owned();
-        let segments: Vec<&str> = rel_str
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .collect();
+        let segments: Vec<&str> = rel_str.split('/').filter(|s| !s.is_empty()).collect();
         if glob_match(&pattern_segments, &segments) {
             matched.push(module.path.clone());
         }
@@ -245,8 +233,7 @@ async fn run_module(
         .into());
     }
 
-    let commands =
-        client.commands_for_module(command_name, module_path, profile_names);
+    let commands = client.commands_for_module(command_name, module_path, profile_names);
 
     if commands.is_empty() {
         if !profile_names.is_empty() {
@@ -320,13 +307,19 @@ mod tests {
     fn test_glob_match_single_star() {
         assert!(glob_match(&["packages", "*"], &["packages", "api"]));
         assert!(glob_match(&["packages", "*"], &["packages", "worker"]));
-        assert!(!glob_match(&["packages", "*"], &["packages", "sub", "deep"]));
+        assert!(!glob_match(
+            &["packages", "*"],
+            &["packages", "sub", "deep"]
+        ));
     }
 
     #[test]
     fn test_glob_match_double_star() {
         assert!(glob_match(&["packages", "**"], &["packages", "api"]));
-        assert!(glob_match(&["packages", "**"], &["packages", "sub", "deep"]));
+        assert!(glob_match(
+            &["packages", "**"],
+            &["packages", "sub", "deep"]
+        ));
         assert!(!glob_match(&["packages", "**"], &["other", "api"]));
     }
 
@@ -413,11 +406,7 @@ mod tests {
     #[test]
     fn test_parse_no_profile() {
         let client = empty_client();
-        let args = RunArgs::parse(
-            &client,
-            vec!["build".into(), "packages/api".into()],
-        )
-        .unwrap();
+        let args = RunArgs::parse(&client, vec!["build".into(), "packages/api".into()]).unwrap();
         assert!(args.profiles.is_empty());
         assert_eq!(args.command, "build");
         assert_eq!(args.modules, vec!["packages/api"]);
@@ -449,11 +438,7 @@ mod tests {
         let client = empty_client();
         let args = RunArgs::parse(
             &client,
-            vec![
-                "install".into(),
-                "packages/a".into(),
-                "packages/b".into(),
-            ],
+            vec!["install".into(), "packages/a".into(), "packages/b".into()],
         )
         .unwrap();
         assert_eq!(args.command, "install");

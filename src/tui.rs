@@ -28,20 +28,20 @@ use anyhow::Result;
 use crossterm::{
     event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use futures::StreamExt;
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::{io, sync::Arc, time::Duration};
 #[cfg(unix)]
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::oneshot;
 
 use crate::{
@@ -233,12 +233,10 @@ impl TuiApp {
         let command = item.command.name.clone();
         let script = item.command.path.clone();
 
-        let id = self.client.executor.add_process(
-            &module.to_string_lossy(),
-            &profile,
-            &command,
-            None,
-        );
+        let id =
+            self.client
+                .executor
+                .add_process(&module.to_string_lossy(), &profile, &command, None);
 
         self.log.push(format!(
             "Spawned #{}: {}/{} on {}",
@@ -853,10 +851,7 @@ mod tests {
         app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
         assert_eq!(app.module_idx, 0);
         assert!(!app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE)));
-        assert!(app.handle_key(KeyEvent::new(
-            KeyCode::Char('c'),
-            KeyModifiers::CONTROL,
-        )));
+        assert!(app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL,)));
     }
 
     #[test]

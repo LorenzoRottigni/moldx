@@ -1,6 +1,6 @@
 use crate::errors::MoldXError2;
 use crate::types::Entity;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::fs;
 use std::{
     collections::BTreeSet,
@@ -70,14 +70,11 @@ pub fn file_names_for_dir(root: &Path) -> Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     for entry in WalkDir::new(root).min_depth(1).into_iter().flatten() {
         let path = entry.path();
-        let hidden = path
-            .strip_prefix(root)
-            .ok()
-            .is_some_and(|relative| {
-                relative.components().any(|component| {
-                    component.as_os_str().to_string_lossy().starts_with('.')
-                })
-            });
+        let hidden = path.strip_prefix(root).ok().is_some_and(|relative| {
+            relative
+                .components()
+                .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+        });
         if !path.is_file() || hidden {
             continue;
         }
@@ -116,12 +113,12 @@ pub fn resolve_name(path: &Path, entity: Entity) -> Result<String> {
     } else {
         None
     }
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| MoldXError2::NameResolutionFailed {
-            path: path.to_path_buf(),
-            entity,
-        })?
-        .to_owned();
+    .and_then(|name| name.to_str())
+    .ok_or_else(|| MoldXError2::NameResolutionFailed {
+        path: path.to_path_buf(),
+        entity,
+    })?
+    .to_owned();
 
     if name == "." || name == ".." {
         bail!(MoldXError2::InvalidName { name, entity });
@@ -192,7 +189,10 @@ where
         }
     }
 
-    bail!(MoldXError2::DiscoveryFailed { start, kind: ".moldx" })
+    bail!(MoldXError2::DiscoveryFailed {
+        start,
+        kind: ".moldx"
+    })
 }
 
 #[cfg(test)]

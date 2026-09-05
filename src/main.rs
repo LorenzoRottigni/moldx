@@ -51,12 +51,9 @@ async fn main() -> Result<()> {
         println!("{}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-    // Scaffolding commands (init/new) may create `.moldx` and therefore must
-    // not fail when the directory does not yet exist.
-    let create_if_missing = matches!(
-        &cli.command,
-        Some(cli::Command::Init { .. }) | Some(cli::Command::New { .. })
-    );
+    // Scaffolding commands (init) may create `.moldx` and therefore must not
+    // fail when the directory does not yet exist.
+    let create_if_missing = matches!(&cli.command, Some(cli::Command::Init { .. }));
     let config = config::MoldXConfig::new(
         cli.moldx_dir.clone(),
         cli.profiles_dir_name.clone(),
@@ -67,7 +64,11 @@ async fn main() -> Result<()> {
         cli.modules_dir.clone(),
         create_if_missing,
     )?;
-    let client = client::MoldXClient::new(config)?;
+    let client = if create_if_missing {
+        client::MoldXClient::new_for_scaffolding(config)?
+    } else {
+        client::MoldXClient::new(config)?
+    };
     cli.exec_with(&client).await?;
     Ok(())
 }

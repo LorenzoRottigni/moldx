@@ -164,18 +164,18 @@ impl Executor {
     ///
     /// Returns [`MoldXError2::ProcessSpawnFailed`] if the process cannot be
     /// spawned or its PID cannot be determined.
-    pub async fn exec(
-        &mut self,
-        script: &Path,
-        module_path: &Path,
-    ) -> Result<u32> {
+    pub async fn exec(&mut self, script: &Path, module_path: &Path) -> Result<u32> {
         let child = Command::new("bash")
             .arg(script)
             .arg(module_path)
             .spawn()
-            .map_err(|e| MoldXError2::ProcessSpawnFailed { reason: e.to_string() })?;
+            .map_err(|e| MoldXError2::ProcessSpawnFailed {
+                reason: e.to_string(),
+            })?;
 
-        let pid = child.id().ok_or_else(|| MoldXError2::ProcessSpawnFailed { reason: "failed to get process ID".to_string() })?;
+        let pid = child.id().ok_or_else(|| MoldXError2::ProcessSpawnFailed {
+            reason: "failed to get process ID".to_string(),
+        })?;
         self.processes.insert(pid, child);
         Ok(pid)
     }
@@ -239,7 +239,13 @@ impl Executor {
     /// # Returns
     ///
     /// The unique identifier assigned to the tracked process.
-    pub fn add_process(&self, module_path: &str, profile: &str, command: &str, pid: Option<u32>) -> u64 {
+    pub fn add_process(
+        &self,
+        module_path: &str,
+        profile: &str,
+        command: &str,
+        pid: Option<u32>,
+    ) -> u64 {
         let mut g = self.state.lock().unwrap();
         let id = g.next_id;
         g.next_id += 1;
@@ -397,7 +403,12 @@ impl Executor {
 impl Display for Executor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let g = self.state.lock().map_err(|_| fmt::Error)?;
-        writeln!(f, "{} {} running", "executor:".bold().yellow(), g.processes.len())?;
+        writeln!(
+            f,
+            "{} {} running",
+            "executor:".bold().yellow(),
+            g.processes.len()
+        )?;
         for process in &g.processes {
             writeln!(
                 f,
@@ -493,7 +504,10 @@ mod tests {
         assert_eq!(ProcessStatus::Running.label(), "Running");
         assert_eq!(ProcessStatus::Completed(0).label(), "Done(0)");
         assert_eq!(ProcessStatus::Completed(1).label(), "Done(1)");
-        assert_eq!(ProcessStatus::Failed("timeout".into()).label(), "Failed: timeout");
+        assert_eq!(
+            ProcessStatus::Failed("timeout".into()).label(),
+            "Failed: timeout"
+        );
         assert_eq!(ProcessStatus::Killed.label(), "Killed");
     }
 
@@ -653,9 +667,22 @@ mod tests {
         executor.update_status(id2, ProcessStatus::Completed(0));
         executor.kill_all_running();
         let summaries = executor.get_summaries();
-        assert_eq!(summaries.iter().find(|s| s.id == id1).unwrap().status, ProcessStatus::Killed);
-        assert!(!summaries.iter().find(|s| s.id == id2).unwrap().status.is_running());
-        assert_eq!(summaries.iter().find(|s| s.id == id3).unwrap().status, ProcessStatus::Killed);
+        assert_eq!(
+            summaries.iter().find(|s| s.id == id1).unwrap().status,
+            ProcessStatus::Killed
+        );
+        assert!(
+            !summaries
+                .iter()
+                .find(|s| s.id == id2)
+                .unwrap()
+                .status
+                .is_running()
+        );
+        assert_eq!(
+            summaries.iter().find(|s| s.id == id3).unwrap().status,
+            ProcessStatus::Killed
+        );
     }
 
     #[test]
@@ -680,7 +707,10 @@ mod tests {
         let script = dir.path().join("test.sh");
         std::fs::write(&script, "#!/bin/bash\nexit 0").unwrap();
         let executor = Executor::new();
-        let code = executor.exec_blocking(&script, dir.path(), &[]).await.unwrap();
+        let code = executor
+            .exec_blocking(&script, dir.path(), &[])
+            .await
+            .unwrap();
         assert_eq!(code, 0);
     }
 
@@ -690,7 +720,10 @@ mod tests {
         let script = dir.path().join("fail.sh");
         std::fs::write(&script, "#!/bin/bash\nexit 42").unwrap();
         let executor = Executor::new();
-        let code = executor.exec_blocking(&script, dir.path(), &[]).await.unwrap();
+        let code = executor
+            .exec_blocking(&script, dir.path(), &[])
+            .await
+            .unwrap();
         assert_eq!(code, 42);
     }
 
@@ -707,10 +740,12 @@ mod tests {
     #[tokio::test]
     async fn test_exec_nonexistent_script() {
         let mut executor = Executor::new();
-        let result = executor.exec(
-            std::path::Path::new("/nonexistent/script.sh"),
-            std::path::Path::new("/tmp"),
-        ).await;
+        let result = executor
+            .exec(
+                std::path::Path::new("/nonexistent/script.sh"),
+                std::path::Path::new("/tmp"),
+            )
+            .await;
         if let Ok(pid) = result {
             assert!(pid > 0);
         }
@@ -759,10 +794,10 @@ mod tests {
             id,
             std::path::PathBuf::from("/nonexistent/script.sh"),
             std::path::PathBuf::from("/tmp"),
-        ).await;
+        )
+        .await;
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         let summary = &executor.get_summaries()[0];
         assert!(!summary.status.is_running());
     }
 }
-

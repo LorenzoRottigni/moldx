@@ -322,7 +322,7 @@ resolved `docker/build` command.
 
 Creating MoldX entities through the `init` command allows MoldX to validate input, enforce constraints, and prevent undefined or invalid configurations.
 
-### `moldx status`
+### `moldx list`
 
 Prints the state of the MoldX client after initialization, including available profiles, commands, templates, and resolved modules.
 
@@ -494,7 +494,7 @@ MoldX includes a playground for local experimentation.
 When running MoldX locally:
 
 ```bash
-cargo run -- status
+cargo run -- list
 ```
 
 MoldX automatically resolves the playground's `.moldx` directory, making it possible to test profiles, templates, commands, and module resolution without modifying the development environment itself.

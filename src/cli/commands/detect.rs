@@ -17,10 +17,7 @@ use anyhow::Result;
 /// # Errors
 ///
 /// Always returns `Ok(())`.
-pub async fn detect(
-    client: &MoldXClient,
-    path: PathBuf,
-) -> Result<()> {
+pub async fn detect(client: &MoldXClient, path: PathBuf) -> Result<()> {
     let profiles = client.profiles_for_module(&path);
     println!("Detected profiles for {}:", path.to_string_lossy());
     for p in &profiles {

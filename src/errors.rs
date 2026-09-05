@@ -19,7 +19,9 @@ pub enum MoldXError2 {
     #[error("[MoldX Error] Invalid {entity} name: {name}.")]
     InvalidName { entity: Entity, name: String },
 
-    #[error("[MoldX Error] Parent profile {parent} template must be a subset of child profile template: {child}.")]
+    #[error(
+        "[MoldX Error] Parent profile {parent} template must be a subset of child profile template: {child}."
+    )]
     UnmatchedChildProfile { parent: PathBuf, child: PathBuf },
 
     #[error("[MoldX Error] Command must be a shell script: {path}.")]
@@ -85,23 +87,13 @@ pub enum MoldXError2 {
     #[error("[MoldX Error] Module path already exists: {path}")]
     ModulePathAlreadyExists { path: PathBuf },
 
-    #[error("[MoldX Error] Usage: moldx new <profile|module|command> ...")]
-    NewUsage,
-
-    #[error("[MoldX Error] Usage: moldx [profile] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth")]
+    #[error(
+        "[MoldX Error] Usage: moldx [profile] <command> <path>\n       moldx docker build ./services/auth\n       moldx build ./services/auth"
+    )]
     RunUsage,
 
     #[error("[MoldX Error] Too many arguments; usage: moldx [profile] <command> <path>")]
     TooManyArguments,
-
-    #[error("[MoldX Error] Usage: moldx new profile <profile>")]
-    NewProfileUsage,
-
-    #[error("[MoldX Error] Usage: moldx new command [profile] <command>")]
-    NewCommandUsage,
-
-    #[error("[MoldX Error] Usage: moldx new module [profile] [template] <module-path>")]
-    NewModuleUsage,
 
     #[error("[MoldX Error] Failed to wait on process: {reason}")]
     ProcessWaitFailed { reason: String },

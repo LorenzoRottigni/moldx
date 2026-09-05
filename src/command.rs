@@ -2,7 +2,7 @@ use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
 
-use crate::errors::{MoldXError2};
+use crate::errors::MoldXError2;
 use crate::fs::{is_shell_script, resolve_name, sorted_read_dir};
 use crate::types::Entity;
 use anyhow::{Result, bail};
@@ -56,11 +56,7 @@ impl Command {
             .unwrap_or("")
             .to_string();
 
-        Ok(Self {
-            name,
-            path,
-            format,
-        })
+        Ok(Self { name, path, format })
     }
 
     /// Discovers and loads all commands in a directory.
@@ -111,7 +107,7 @@ impl Display for Command {
 
 #[cfg(test)]
 mod tests {
-use super::*;
+    use super::*;
     use std::fs;
     use tempfile::tempdir;
 

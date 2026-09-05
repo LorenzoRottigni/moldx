@@ -1,10 +1,10 @@
 use crate::constants::MOLDX_DIR_NAME;
-use crate::errors::{MoldXError2};
+use crate::errors::MoldXError2;
 use crate::fs;
+use anyhow::Result;
 use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::PathBuf;
-use anyhow::{Result};
 
 /// Configuration for a MoldX project.
 ///
@@ -77,7 +77,9 @@ impl MoldXConfig {
         } else {
             moldx_dir
                 .parent()
-                .ok_or_else(|| MoldXError2::ModulesRootResolutionFailed { path: moldx_dir.clone() })?
+                .ok_or_else(|| MoldXError2::ModulesRootResolutionFailed {
+                    path: moldx_dir.clone(),
+                })?
                 .to_path_buf()
         };
         let profiles_dir_name_clone = profiles_dir_name.clone();
@@ -122,8 +124,8 @@ impl Display for MoldXConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_config_new_with_existing_dir() {
@@ -139,7 +141,8 @@ mod tests {
             20,
             None,
             false,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(config.moldx_dir, moldx_dir);
         assert_eq!(config.profiles_dir, moldx_dir.join("profiles"));
         assert_eq!(config.modules_dir, dir.path());
@@ -165,7 +168,8 @@ mod tests {
             20,
             Some(modules_dir.to_str().unwrap().into()),
             false,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(config.modules_dir, modules_dir);
     }
 
@@ -183,7 +187,8 @@ mod tests {
             20,
             None,
             false,
-        ).unwrap();
+        )
+        .unwrap();
         let display = config.to_string();
         assert!(display.contains("moldx_dir:"));
         assert!(display.contains("profiles_dir:"));
@@ -204,7 +209,8 @@ mod tests {
             20,
             None,
             true,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(config.moldx_dir, moldx_dir);
         assert_eq!(config.profiles_dir, moldx_dir.join("profiles"));
         assert_eq!(config.modules_dir, dir.path());

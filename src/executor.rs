@@ -8,11 +8,35 @@ use anyhow::Result;
 use owo_colors::OwoColorize;
 use std::{
     collections::{HashMap, VecDeque},
+    ffi::OsString,
     fmt::{self, Display},
     path::Path,
     sync::{Arc, Mutex},
     time::SystemTime,
 };
+
+/// Resolves a usable `bash` executable for the current platform.
+///
+/// On Unix, `bash` is expected on `PATH`. On Windows, the generic `bash`
+/// command may resolve to the Windows Subsystem for Linux launcher
+/// (`System32\bash.exe`), which fails when no distribution is installed.
+/// This helper prefers a Git for Windows `bash.exe` (which ships a real
+/// POSIX shell) before falling back to the plain `bash` command.
+fn bash_path() -> OsString {
+    #[cfg(windows)]
+    {
+        for candidate in [
+            "C:\\Program Files\\Git\\bin\\bash.exe",
+            "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+            "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+        ] {
+            if std::path::Path::new(candidate).exists() {
+                return candidate.into();
+            }
+        }
+    }
+    "bash".into()
+}
 use tokio::process::{Child, Command};
 
 use crate::errors::MoldXError2;
@@ -172,7 +196,7 @@ impl Executor {
     /// Returns [`MoldXError2::ProcessSpawnFailed`] if the process cannot be
     /// spawned or its PID cannot be determined.
     pub async fn exec(&mut self, script: &Path, module_path: &Path) -> Result<u32> {
-        let child = Command::new("bash")
+        let child = Command::new(bash_path())
             .arg(script)
             .arg(module_path)
             .spawn()
@@ -242,7 +266,7 @@ impl Executor {
         script: &Path,
         args: &[String],
     ) -> Result<i32> {
-        let mut command = Command::new("bash");
+        let mut command = Command::new(bash_path());
         command.arg(script);
         if let Some(module_path) = module_path {
             command.arg(module_path);
@@ -466,7 +490,7 @@ pub async fn run_and_track(
     use std::process::Stdio;
     use tokio::io::{AsyncBufReadExt, BufReader};
 
-    let mut cmd = Command::new("bash");
+    let mut cmd = Command::new(bash_path());
     cmd.arg(&script)
         .arg(&module_path)
         .stdout(Stdio::piped())

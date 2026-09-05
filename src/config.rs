@@ -140,7 +140,12 @@ mod tests {
     #[test]
     fn test_config_new_with_existing_dir() {
         let dir = tempdir().unwrap();
-        let moldx_dir = dir.path().join(".moldx");
+        // `MoldXConfig::new` canonicalizes an existing `.moldx` directory, so
+        // the expected paths must be canonicalized too: on macOS the `/var`
+        // → `/private/var` symlink and on Windows the `\\?\` prefix and 8.3
+        // short names (e.g. `RUNNER~1`) would otherwise not compare equal.
+        let dir_path = dir.path().canonicalize().unwrap();
+        let moldx_dir = dir_path.join(".moldx");
         fs::create_dir(&moldx_dir).unwrap();
         let config = MoldXConfig::new(
             moldx_dir.to_str().unwrap().into(),
@@ -155,7 +160,7 @@ mod tests {
         .unwrap();
         assert_eq!(config.moldx_dir, moldx_dir);
         assert_eq!(config.profiles_dir, moldx_dir.join("profiles"));
-        assert_eq!(config.modules_dir, dir.path());
+        assert_eq!(config.modules_dir, dir_path);
         assert_eq!(config.bin_dir_name, "bin");
         assert_eq!(config.template_dir_name, "template");
         assert_eq!(config.templates_dir_name, "templates");

@@ -1,3 +1,5 @@
+//! Implementation of the MoldX subcommands.
+
 pub mod detect;
 pub mod init;
 pub mod list;

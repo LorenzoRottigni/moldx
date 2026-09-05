@@ -1,3 +1,9 @@
+//! Error types raised by MoldX operations.
+//!
+//! [`crate::errors::MoldXError2`] is the single error enum for the crate. Every variant
+//! renders a user-facing message via its [`std::error::Error`]
+//! implementation.
+
 use std::path::PathBuf;
 use thiserror::Error;
 

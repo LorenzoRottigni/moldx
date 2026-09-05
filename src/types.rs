@@ -1,3 +1,8 @@
+//! Shared type definitions.
+//!
+//! [`crate::types::Entity`] enumerates the kinds of artifacts MoldX manages: templates,
+//! modules, commands, and profiles.
+
 use crate::errors::MoldXError2;
 use anyhow::Result;
 use std::fmt;

@@ -1,3 +1,8 @@
+//! Facade for interacting with a resolved MoldX project.
+//!
+//! [`crate::client::MoldXClient`] ties together profiles, modules, and the executor,
+//! providing discovery of modules and resolution of commands.
+
 use crate::executor::Executor;
 use crate::module::Module;
 use crate::profile::Profile;
@@ -113,7 +118,7 @@ impl MoldXClient {
     /// Walks the modules directory and returns matched modules without
     /// mutating the client.
     ///
-    /// Behaves identically to [`load_modules`] but returns the result
+    /// Behaves identically to [`Self::load_modules`] but returns the result
     /// instead of storing it.
     ///
     /// # Returns
@@ -178,6 +183,19 @@ impl MoldXClient {
             .collect()
     }
 
+    /// Resolves every command named `command_name` that applies to a module,
+    /// optionally restricted to a profile hierarchy.
+    ///
+    /// # Arguments
+    ///
+    /// * `command_name` - The name of the command to search for.
+    /// * `module_path` - The module the command will be run against.
+    /// * `profile_names` - Optional profile hierarchy to restrict the search;
+    ///   an empty slice searches all profiles.
+    ///
+    /// # Returns
+    ///
+    /// The list of matching commands, in resolution order.
     pub fn commands_for_module(
         &self,
         command_name: &str,
@@ -195,6 +213,15 @@ impl MoldXClient {
         discovered
     }
 
+    /// Returns the direct children of the root profile.
+    ///
+    /// The root profile (`.moldx`) owns technology profiles such as `docker`
+    /// and `node`; this accessor exposes them for module resolution. It
+    /// returns an empty slice when no root profile is present.
+    ///
+    /// # Returns
+    ///
+    /// The root profile's child profiles.
     pub fn profile_children(&self) -> &[Profile] {
         self.profiles
             .first()
@@ -202,6 +229,16 @@ impl MoldXClient {
             .unwrap_or(&[])
     }
 
+    /// Looks up a profile by name across the whole profile tree, including
+    /// nested child profiles.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The profile name to search for.
+    ///
+    /// # Returns
+    ///
+    /// The first profile matching `name`, or `None` if no profile matches.
     pub fn find_profile(&self, name: &str) -> Option<&Profile> {
         fn find<'a>(profiles: &'a [Profile], name: &str) -> Option<&'a Profile> {
             profiles.iter().find_map(|profile| {
@@ -212,16 +249,6 @@ impl MoldXClient {
         }
 
         find(self.profile_children(), name)
-    }
-
-    /// Placeholder for future command-handler dispatch logic.
-    ///
-    /// # Returns
-    ///
-    /// Always returns `Ok(())`.
-    pub fn exec() -> Result<()> {
-        // find a way to associate handler mod resolution with enum values
-        Ok(())
     }
 }
 

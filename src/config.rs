@@ -1,3 +1,8 @@
+//! Project configuration resolution.
+//!
+//! [`crate::config::MoldXConfig`] holds every directory path and naming convention used to
+//! locate and resolve profiles, modules, and templates in a `.moldx` tree.
+
 use crate::constants::MOLDX_DIR_NAME;
 use crate::errors::MoldXError2;
 use crate::fs;

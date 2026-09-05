@@ -1,3 +1,8 @@
+//! Discovered project modules.
+//!
+//! [`crate::module::Module`] represents any directory under the modules root whose file
+//! names satisfy at least one profile's template.
+
 use anyhow::{Result, bail};
 use owo_colors::OwoColorize;
 use std::fmt::{self, Display};

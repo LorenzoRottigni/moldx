@@ -1,3 +1,7 @@
+//! `moldx detect` subcommand.
+//!
+//! Prints the profiles whose templates match a given module path.
+
 use std::path::PathBuf;
 
 use crate::client::MoldXClient;

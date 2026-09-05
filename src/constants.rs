@@ -1,3 +1,8 @@
+//! Default directory and file names used by MoldX.
+//!
+//! These constants define the conventional layout of a `.moldx` project
+//! tree and can be overridden through CLI flags or environment variables.
+
 /// Default name of the MoldX project directory.
 pub const MOLDX_DIR_NAME: &str = ".moldx";
 

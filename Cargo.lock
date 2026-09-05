@@ -332,12 +332,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fmt"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09904adae26440d46daeacb5ed7922fee69d43ebf84d31e078cd49652cecd718"
-
-[[package]]
 name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -577,7 +571,6 @@ dependencies = [
  "clap",
  "crossterm",
  "dialoguer",
- "fmt",
  "futures",
  "owo-colors",
  "predicates",

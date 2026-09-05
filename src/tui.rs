@@ -62,6 +62,7 @@ struct TuiSession {
 }
 
 impl TuiSession {
+    /// Creates a session wrapping a terminal and the shared executor.
     fn new(terminal: Terminal<CrosstermBackend<io::Stdout>>, executor: Arc<Executor>) -> Self {
         Self {
             terminal: Some(terminal),
@@ -69,10 +70,12 @@ impl TuiSession {
         }
     }
 
+    /// Returns a mutable handle to the terminal, if still present.
     fn terminal_mut(&mut self) -> Option<&mut Terminal<CrosstermBackend<io::Stdout>>> {
         self.terminal.as_mut()
     }
 
+    /// Kills running processes and restores the terminal to its normal mode.
     fn cleanup(&mut self) {
         self.executor.kill_all_running();
         if let Some(mut terminal) = self.terminal.take() {
@@ -96,6 +99,7 @@ enum Panel {
 }
 
 impl Panel {
+    /// Returns the panel cycled forward, wrapping to the first.
     fn next(self) -> Panel {
         match self {
             Panel::Modules => Panel::Commands,
@@ -103,6 +107,7 @@ impl Panel {
             Panel::Running => Panel::Modules,
         }
     }
+    /// Returns the panel cycled backward, wrapping to the last.
     fn prev(self) -> Panel {
         match self {
             Panel::Modules => Panel::Running,
@@ -138,6 +143,8 @@ struct CommandItem {
 }
 
 impl TuiApp {
+    /// Builds a UI state from the client's modules and rebuilds the command
+    /// list for the first module.
     fn new(client: Arc<MoldXClient>) -> Self {
         let mut app = TuiApp {
             modules: client.modules.clone(),
@@ -156,6 +163,8 @@ impl TuiApp {
         app
     }
 
+    /// Rebuilds the commands list for the currently selected module, sorted by
+    /// profile name and then command name.
     fn rebuild_command_items(&mut self) {
         self.command_items.clear();
         self.command_idx = 0;
@@ -178,10 +187,15 @@ impl TuiApp {
         }
     }
 
+    /// Returns the module at the current cursor position, if any.
     fn selected_module(&self) -> Option<&Module> {
         self.modules.get(self.module_idx)
     }
 
+    /// Starts an asynchronous re-scan of modules if one is not already running.
+    ///
+    /// The result is delivered through a oneshot channel consumed by
+    /// [`TuiApp::tick`].
     fn trigger_refresh(&mut self) {
         if self.is_refreshing {
             return;
@@ -196,6 +210,10 @@ impl TuiApp {
         });
     }
 
+    /// Polls a pending module refresh and applies its result.
+    ///
+    /// Called periodically from the UI event loop. On success the module
+    /// list and command items are rebuilt; failures are logged.
     fn tick(&mut self) {
         if let Some(rx) = self.refresh_rx.as_mut() {
             match rx.try_recv() {
@@ -220,6 +238,10 @@ impl TuiApp {
         }
     }
 
+    /// Registers and spawns the command selected in the Commands panel.
+    ///
+    /// The process is tracked by the shared executor and its output is
+    /// streamed into the Running panel via [`executor::run_and_track`].
     fn run_selected_command(&mut self) {
         let module = match self.selected_module() {
             Some(m) => m.path.clone(),
@@ -250,6 +272,12 @@ impl TuiApp {
         tokio::spawn(executor::run_and_track(executor, id, script, module));
     }
 
+    /// Handles a key event, mutating UI state as needed.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the key should quit the UI (`q` on the Modules panel or
+    /// `Ctrl+C` anywhere), `false` otherwise.
     fn handle_key(&mut self, key: KeyEvent) -> bool {
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             return true;
@@ -286,6 +314,10 @@ impl TuiApp {
         false
     }
 
+    /// Moves the cursor of the active panel by `delta` (usually `-1` or `1`).
+    ///
+    /// The cursor wraps around the panel's list. Moving within the Modules
+    /// panel rebuilds the command items for the newly selected module.
     fn move_cursor(&mut self, delta: i32) {
         match self.active_panel {
             Panel::Modules => {
@@ -340,6 +372,13 @@ impl TuiApp {
 
 // ─── Terminal helpers ────────────────────────────────────────────────────────
 
+/// Enables raw mode, enters the alternate screen, and creates a terminal
+/// backend.
+///
+/// # Errors
+///
+/// Returns an error if raw mode, the screen switch, or terminal creation
+/// fails.
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -348,6 +387,11 @@ fn setup_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
     Ok(Terminal::new(backend)?)
 }
 
+/// Disables raw mode, leaves the alternate screen, and shows the cursor.
+///
+/// # Errors
+///
+/// Returns an error if any terminal operation fails.
 fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -355,7 +399,8 @@ fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Re
     Ok(())
 }
 
-async fn wait_for_shutdown_signal() {
+/// Resolves when a shutdown signal (`Ctrl+C` or `SIGTERM`) is received.
+    async fn wait_for_shutdown_signal() {
     #[cfg(unix)]
     {
         let mut sigterm = match signal(SignalKind::terminate()) {
@@ -383,7 +428,9 @@ async fn wait_for_shutdown_signal() {
 
 // ─── Drawing ─────────────────────────────────────────────────────────────────
 
-fn draw(frame: &mut Frame, app: &mut TuiApp) {
+/// Renders the full UI (layouts the three panels and the help bar) for a
+    /// frame.
+    fn draw(frame: &mut Frame, app: &mut TuiApp) {
     let area = frame.area();
 
     let vertical = Layout::default()
@@ -406,7 +453,8 @@ fn draw(frame: &mut Frame, app: &mut TuiApp) {
     draw_help(frame, vertical[1]);
 }
 
-fn panel_block(title: &str, active: bool) -> Block<'_> {
+/// Builds the bordered block used as a panel frame, highlighted when active.
+    fn panel_block(title: &str, active: bool) -> Block<'_> {
     let border_style = if active {
         Style::default().fg(Color::Cyan)
     } else {
@@ -423,7 +471,9 @@ fn panel_block(title: &str, active: bool) -> Block<'_> {
         .border_style(border_style)
 }
 
-fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
+/// Renders the Modules panel: a logo banner (when roomy enough) and the
+    /// list of discovered modules with their matching profiles.
+    fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     let active = app.active_panel == Panel::Modules;
     let title = if app.is_refreshing {
         "Modules (scanning\u{2026})"
@@ -540,7 +590,9 @@ fn draw_modules(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     frame.render_stateful_widget(list, content_area, &mut list_state);
 }
 
-fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
+/// Renders the Commands panel: the commands available for the currently
+    /// selected module.
+    fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     let active = app.active_panel == Panel::Commands;
     let module_name = app
         .selected_module()
@@ -599,7 +651,9 @@ fn draw_commands(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     frame.render_stateful_widget(list, area, &mut list_state);
 }
 
-fn draw_running(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
+/// Renders the Running panel: the list of tracked processes and the buffered
+    /// output of the selected one.
+    fn draw_running(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     let active = app.active_panel == Panel::Running;
     let summaries = app.client.executor.get_summaries();
 
@@ -701,7 +755,8 @@ fn draw_running(frame: &mut Frame, app: &mut TuiApp, area: Rect) {
     frame.render_widget(output_para, inner[1]);
 }
 
-fn draw_help(frame: &mut Frame, area: Rect) {
+/// Renders the key-binding help bar at the bottom of the screen.
+    fn draw_help(frame: &mut Frame, area: Rect) {
     let help = Paragraph::new(Line::from(vec![
         Span::styled(" Tab", Style::default().fg(Color::Cyan)),
         Span::raw(":panel  "),

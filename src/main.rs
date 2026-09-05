@@ -31,7 +31,7 @@ pub mod profile;
 pub mod template;
 /// Interactive terminal UI built with ratatui.
 pub mod tui;
-/// Shared type definitions (e.g. [`Entity`]).
+/// Shared type definitions (e.g. [`types::Entity`]).
 pub mod types;
 
 /// Runs the MoldX command line application.

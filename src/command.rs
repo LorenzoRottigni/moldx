@@ -1,3 +1,8 @@
+//! Executable profile scripts.
+//!
+//! [`crate::command::Command`] wraps a single `.sh` file inside a profile's bin directory,
+//! exposing the command name derived from the file stem.
+
 use owo_colors::OwoColorize;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};

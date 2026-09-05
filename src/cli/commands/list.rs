@@ -1,3 +1,8 @@
+//! `moldx list` subcommand.
+//!
+//! Prints the current MoldX state: configuration, executor status, profiles,
+//! and modules.
+
 use anyhow::Result;
 
 use crate::client::MoldXClient;

@@ -1,3 +1,7 @@
+//! `moldx ui` subcommand.
+//!
+//! Launches the interactive ratatui-based terminal UI.
+
 use crate::{client::MoldXClient, tui};
 use anyhow::Result;
 

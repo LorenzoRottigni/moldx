@@ -1,3 +1,9 @@
+//! Filesystem helpers for reading directories and discovering paths.
+//!
+//! Utilities cover sorted directory reads, shell-script detection, template
+//! file-name collection, name resolution, and upward/downward path
+//! discovery.
+
 use crate::errors::MoldXError2;
 use crate::types::Entity;
 use anyhow::{Result, bail};

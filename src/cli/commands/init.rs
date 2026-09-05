@@ -1,3 +1,8 @@
+//! `moldx init` subcommand.
+//!
+//! Initializes a new `.moldx` structure or scaffolds profiles, commands, and
+//! template files.
+
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
@@ -5,6 +10,11 @@ use std::path::PathBuf;
 use crate::client::MoldXClient;
 use crate::errors::MoldXError2;
 
+/// Builds the filesystem path for a (possibly nested) profile hierarchy.
+///
+/// Each part after the first is nested under a `profiles` directory, e.g.
+/// `["node", "nuxt"]` resolves to
+/// `<profiles_dir>/node/profiles/nuxt`.
 fn profile_dir_for_parts(client: &MoldXClient, parts: &[String]) -> PathBuf {
     let mut path = client.config.profiles_dir.clone();
     for (index, part) in parts.iter().enumerate() {
@@ -16,10 +26,18 @@ fn profile_dir_for_parts(client: &MoldXClient, parts: &[String]) -> PathBuf {
     path
 }
 
+/// Returns the profile parts used when no profile is given: `["default"]`.
 fn default_profile_parts() -> Vec<String> {
     vec!["default".to_string()]
 }
 
+/// Splits template arguments into a profile hierarchy and template files.
+///
+/// The longest leading run of arguments that matches an already-known
+/// profile (or an existing profile directory) is treated as the profile
+/// hierarchy; everything after it is treated as template file names. When no
+/// existing profile matches, the `default` profile is used and all arguments
+/// are treated as template files.
 fn profile_parts_for_template(client: &MoldXClient, args: &[String]) -> (Vec<String>, Vec<String>) {
     fn profile_exists(profiles: &[crate::profile::Profile], parts: &[String]) -> bool {
         let Some((head, tail)) = parts.split_first() else {

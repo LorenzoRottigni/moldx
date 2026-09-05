@@ -1,3 +1,9 @@
+//! Command line interface parsing and dispatch.
+//!
+//! [`crate::cli::Cli`] defines the global options and subcommands accepted by the
+//! `moldx` binary. Global options can also be supplied through `MOLDX_*`
+//! environment variables.
+
 use anyhow::Result;
 use clap::Parser;
 use clap::Subcommand;
@@ -132,7 +138,7 @@ pub enum Command {
         args: Vec<String>,
     },
 
-    /// Run a command: moldx [profile...] <command> <path> [-- <command options...>]
+    /// Run a command: moldx [profile...] `<command>` `<path>` [-- `<command options...>`]
     #[command(external_subcommand)]
     Run(Vec<String>),
 }

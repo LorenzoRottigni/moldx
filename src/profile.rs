@@ -1,3 +1,9 @@
+//! Named collections of templates, commands, and nested profiles.
+//!
+//! [`crate::profile::Profile`] models a single configuration variant (e.g. `docker` or
+//! `podman`), owning a template, a set of executable commands, and optional
+//! nested child profiles.
+
 use crate::{
     command::Command,
     config::MoldXConfig,

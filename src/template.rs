@@ -1,3 +1,8 @@
+//! Template files used to identify and scaffold modules.
+//!
+//! [`crate::template::Template`] is a directory of marker files. A directory matches a
+//! template when it contains at least all of the template's file names.
+
 use owo_colors::OwoColorize;
 use std::collections::BTreeSet;
 use std::fmt::{self, Display};

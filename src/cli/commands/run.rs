@@ -1,3 +1,8 @@
+//! `moldx run` subcommand.
+//!
+//! Parses raw arguments and executes profile commands against one or more
+//! modules, supporting glob patterns and forwarded command options.
+
 use anyhow::Result;
 use dialoguer::Select;
 use std::io::IsTerminal;
@@ -217,6 +222,30 @@ pub async fn run(client: &MoldXClient, args: Vec<String>, skip_conflicts: bool) 
     Ok(())
 }
 
+/// Runs a single command against one module with conflict resolution.
+///
+/// A matching command is resolved with [`MoldXClient::commands_for_module`].
+/// When several profiles expose the command, the caller chooses via
+/// `--skip-conflicts`, an interactive prompt, or an error if no TTY is
+/// available.
+///
+/// # Arguments
+///
+/// * `client` - The initialized MoldX client.
+/// * `command_name` - Name of the command to execute.
+/// * `module_path` - The module the command runs against.
+/// * `profile_names` - Optional profile hierarchy restricting resolution.
+/// * `options` - Arguments forwarded to the command after the module path.
+/// * `skip_conflicts` - Auto-select the first command when several match.
+///
+/// # Returns
+///
+/// Ok when the command exits with status zero.
+///
+/// # Errors
+///
+/// Returns an error if the module path does not exist, no command can be
+/// resolved, or script execution fails.
 async fn run_module(
     client: &MoldXClient,
     command_name: &str,

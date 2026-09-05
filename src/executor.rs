@@ -1,3 +1,9 @@
+//! Process spawning, tracking, and lifecycle management.
+//!
+//! [`crate::executor::Executor`] runs profile scripts in the background or in blocking mode,
+//! and keeps shared state so tracked processes can be inspected, terminated,
+//! and killed from other tasks (e.g. the TUI).
+
 use anyhow::Result;
 use owo_colors::OwoColorize;
 use std::{
@@ -95,6 +101,7 @@ pub struct ProcessSummary {
     pub status: ProcessStatus,
 }
 
+/// Shared state behind the executor: tracked processes and the next ID.
 #[derive(Debug, Default)]
 struct State {
     processes: Vec<RunningProcess>,
@@ -208,7 +215,27 @@ impl Executor {
             .await
     }
 
-    /// Runs a script with an optional module path followed by command options.
+    /// Runs a script to completion with an optional module path followed by
+    /// command options.
+    ///
+    /// The script is executed with `bash`. When `module_path` is provided it
+    /// is passed as the first argument; all elements of `args` are forwarded
+    /// after it. This is the low-level variant of [`Self::exec_blocking`], used by
+    /// the `run` command for root commands that do not target a module.
+    ///
+    /// # Arguments
+    ///
+    /// * `module_path` - Path passed to the script as its first argument, if any.
+    /// * `script` - Path to the shell script to execute.
+    /// * `args` - Additional arguments forwarded to the script.
+    ///
+    /// # Returns
+    ///
+    /// The exit code of the script, or `1` if the code cannot be determined.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process cannot be spawned or waited on.
     pub async fn exec_blocking_optional(
         &self,
         module_path: Option<&Path>,
@@ -383,6 +410,9 @@ impl Executor {
     }
 
     /// Kills all tracked processes that are still running.
+    ///
+    /// Each running process is terminated via [`Self::kill_process`], which sends
+    /// `SIGTERM` to the process group on Unix and marks it as killed.
     pub fn kill_all_running(&self) {
         let running_ids: Vec<u64> = {
             let g = self.state.lock().unwrap();

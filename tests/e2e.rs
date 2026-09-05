@@ -25,7 +25,7 @@ fn moldx() -> Command {
 #[test]
 fn detect_docker_module() {
     moldx()
-        .args(["detect", module("auth-service").to_str().unwrap()])
+        .args(["detect", module("database").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker"));
@@ -43,16 +43,25 @@ fn detect_node_module() {
 #[test]
 fn detect_rust_module() {
     moldx()
-        .args(["detect", module("worker").to_str().unwrap()])
+        .args(["detect", module("worker-rs").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("rust"));
 }
 
 #[test]
+fn detect_python_module() {
+    moldx()
+        .args(["detect", module("backend-api").to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(contains("python"));
+}
+
+#[test]
 fn detect_multi_profile_module_reports_all() {
     moldx()
-        .args(["detect", module("multi-profile").to_str().unwrap()])
+        .args(["detect", module("gateway").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker"))
@@ -68,10 +77,14 @@ fn list_discovers_all_modules() {
         .args(["list"])
         .assert()
         .success()
-        .stdout(contains("auth-service"))
         .stdout(contains("api-server"))
-        .stdout(contains("worker"))
-        .stdout(contains("multi-profile"));
+        .stdout(contains("backend-api"))
+        .stdout(contains("database"))
+        .stdout(contains("frontend-nuxt"))
+        .stdout(contains("frontend-vue"))
+        .stdout(contains("gateway"))
+        .stdout(contains("worker-py"))
+        .stdout(contains("worker-rs"));
 }
 
 #[test]
@@ -82,7 +95,8 @@ fn list_shows_profile_names() {
         .success()
         .stdout(contains("docker"))
         .stdout(contains("node"))
-        .stdout(contains("rust"));
+        .stdout(contains("rust"))
+        .stdout(contains("python"));
 }
 
 // ── run (moldx <profile> <command> <path>) ───────────────────────────────────
@@ -90,7 +104,7 @@ fn list_shows_profile_names() {
 #[test]
 fn run_without_profile_uses_first_detected() {
     moldx()
-        .args(["build", module("auth-service").to_str().unwrap()])
+        .args(["build", module("database").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker/build"));
@@ -99,7 +113,7 @@ fn run_without_profile_uses_first_detected() {
 #[test]
 fn run_without_profile_fails_for_unknown_command() {
     moldx()
-        .args(["nonexistent_cmd", module("auth-service").to_str().unwrap()])
+        .args(["nonexistent_cmd", module("database").to_str().unwrap()])
         .assert()
         .failure()
         .stderr(contains("not found"));
@@ -108,7 +122,7 @@ fn run_without_profile_fails_for_unknown_command() {
 #[test]
 fn run_docker_build_succeeds() {
     moldx()
-        .args(["docker", "build", module("auth-service").to_str().unwrap()])
+        .args(["docker", "build", module("database").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker/build"));
@@ -126,16 +140,30 @@ fn run_node_test_succeeds() {
 #[test]
 fn run_rust_build_succeeds() {
     moldx()
-        .args(["rust", "build", module("worker").to_str().unwrap()])
+        .args(["rust", "build", module("worker-rs").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("rust/build"));
 }
 
 #[test]
+fn run_python_uv_build_succeeds() {
+    moldx()
+        .args([
+            "python",
+            "uv",
+            "build",
+            module("backend-api").to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(contains("python/uv/build"));
+}
+
+#[test]
 fn run_command_on_multi_profile_module() {
     moldx()
-        .args(["docker", "logs", module("multi-profile").to_str().unwrap()])
+        .args(["docker", "logs", module("gateway").to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("docker/logs"));
@@ -146,7 +174,7 @@ fn run_unqualified_conflict_requires_resolution() {
     // `build` is offered by several profiles for the multi-profile module;
     // without a TTY or --skip-conflicts this must not silently pick one.
     moldx()
-        .args(["build", module("multi-profile").to_str().unwrap()])
+        .args(["build", module("gateway").to_str().unwrap()])
         .assert()
         .failure()
         .stderr(contains("--skip-conflicts"));
@@ -158,7 +186,7 @@ fn run_unqualified_conflict_skipped_with_flag() {
         .args([
             "--skip-conflicts",
             "build",
-            module("multi-profile").to_str().unwrap(),
+            module("gateway").to_str().unwrap(),
         ])
         .assert()
         .success()
@@ -170,7 +198,7 @@ fn run_unqualified_conflict_skipped_with_flag() {
 #[test]
 fn run_fails_for_unavailable_profile() {
     moldx()
-        .args(["node", "build", module("auth-service").to_str().unwrap()])
+        .args(["node", "build", module("database").to_str().unwrap()])
         .assert()
         .failure()
         .stderr(contains("not available"));
@@ -182,7 +210,7 @@ fn run_fails_for_unknown_command() {
         .args([
             "docker",
             "nonexistent_cmd",
-            module("auth-service").to_str().unwrap(),
+            module("database").to_str().unwrap(),
         ])
         .assert()
         .failure()

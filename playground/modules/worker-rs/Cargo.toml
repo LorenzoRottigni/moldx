@@ -1,0 +1,9 @@
+[package]
+name = "worker-rs"
+version = "1.0.0"
+edition = "2024"
+description = "Rust worker for the MoldX playground"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

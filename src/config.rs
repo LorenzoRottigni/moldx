@@ -72,6 +72,11 @@ impl MoldXConfig {
                 true,
             )?;
         }
+        // Canonicalize an existing relative path (e.g. `./.moldx`) so that the
+        // modules root derived from its parent is absolute and walkable.
+        if moldx_dir.exists() {
+            moldx_dir = moldx_dir.canonicalize()?;
+        }
         let modules_dir = if let Some(dir) = modules_dir {
             PathBuf::from(&dir)
         } else {

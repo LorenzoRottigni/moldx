@@ -1,0 +1,2 @@
+# pip profile template marker.
+# A module matches the python/pip sub-profile when it also contains requirements.txt.

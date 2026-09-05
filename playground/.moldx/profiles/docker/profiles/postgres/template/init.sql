@@ -1,0 +1,2 @@
+-- postgres profile template marker: requires init.sql
+-- CREATE TABLE users (...)

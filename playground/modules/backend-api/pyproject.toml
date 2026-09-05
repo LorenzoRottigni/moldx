@@ -1,0 +1,17 @@
+[project]
+name = "backend-api"
+version = "1.0.0"
+description = "FastAPI backend for the MoldX playground"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+]
+
+[project.scripts]
+backend-api = "app.main:run"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]

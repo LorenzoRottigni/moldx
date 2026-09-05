@@ -1,0 +1,16 @@
+node_modules/
+target/
+dist/
+.nuxt/
+.output/
+.venv/
+__pycache__/
+*.pyc
+.env
+/playground/modules/*/node_modules/
+/playground/modules/*/target/
+/playground/modules/*/dist/
+/playground/modules/*/.nuxt/
+/playground/modules/*/.venv/
+/playground/modules/*/__pycache__/
+/playground/modules/*/.env

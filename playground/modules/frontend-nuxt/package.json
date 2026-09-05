@@ -1,0 +1,21 @@
+{
+  "name": "frontend-nuxt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "start": "nuxt start",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "nuxt": "^3.12.4",
+    "vue": "^3.4.31"
+  },
+  "devDependencies": {
+    "vitest": "^2.0.5"
+  }
+}

@@ -1,0 +1,5 @@
+# uv profile template marker.
+# A module matches the python/uv sub-profile when it also contains pyproject.toml.
+[project]
+name = "uv-profile-marker"
+version = "0.0.0"

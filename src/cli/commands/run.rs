@@ -188,7 +188,7 @@ pub async fn run(client: &MoldXClient, args: Vec<String>, skip_conflicts: bool) 
                 .exec_blocking_optional(None, &command.path, &args.options)
                 .await?;
             if code != 0 {
-                std::process::exit(code);
+                return Err(MoldXError2::ProcessNonZeroExit { code }.into());
             }
             return Ok(());
         }
@@ -315,7 +315,7 @@ async fn run_module(
         .await?;
 
     if code != 0 {
-        std::process::exit(code);
+        return Err(MoldXError2::ProcessNonZeroExit { code }.into());
     }
 
     Ok(())

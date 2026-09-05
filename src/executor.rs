@@ -273,7 +273,7 @@ impl Executor {
         command: &str,
         pid: Option<u32>,
     ) -> u64 {
-        let mut g = self.state.lock().unwrap();
+        let mut g = self.state.lock().expect("executor state mutex poisoned");
         let id = g.next_id;
         g.next_id += 1;
         g.processes.push(RunningProcess {
@@ -298,7 +298,7 @@ impl Executor {
     /// * `id` - Identifier of the tracked process.
     /// * `pid` - The new PID, or `None` to clear it.
     pub fn update_pid(&self, id: u64, pid: Option<u32>) {
-        let mut g = self.state.lock().unwrap();
+        let mut g = self.state.lock().expect("executor state mutex poisoned");
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
             p.pid = pid;
         }
@@ -313,7 +313,7 @@ impl Executor {
     /// * `id` - Identifier of the tracked process.
     /// * `status` - The new [`ProcessStatus`].
     pub fn update_status(&self, id: u64, status: ProcessStatus) {
-        let mut g = self.state.lock().unwrap();
+        let mut g = self.state.lock().expect("executor state mutex poisoned");
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
             p.status = status;
         }
@@ -329,7 +329,7 @@ impl Executor {
     /// * `id` - Identifier of the tracked process.
     /// * `line` - The output line to append.
     pub fn append_output(&self, id: u64, line: String) {
-        let mut g = self.state.lock().unwrap();
+        let mut g = self.state.lock().expect("executor state mutex poisoned");
         if let Some(p) = g.processes.iter_mut().find(|p| p.id == id) {
             p.output_lines.push_back(line);
             if p.output_lines.len() > 500 {
@@ -344,7 +344,7 @@ impl Executor {
     ///
     /// A [`ProcessSummary`] for every tracked process, in registration order.
     pub fn get_summaries(&self) -> Vec<ProcessSummary> {
-        let g = self.state.lock().unwrap();
+        let g = self.state.lock().expect("executor state mutex poisoned");
         g.processes
             .iter()
             .map(|p| ProcessSummary {
@@ -369,7 +369,7 @@ impl Executor {
     ///
     /// The process output lines, or an empty queue if the process is unknown.
     pub fn get_output(&self, id: u64) -> VecDeque<String> {
-        let g = self.state.lock().unwrap();
+        let g = self.state.lock().expect("executor state mutex poisoned");
         g.processes
             .iter()
             .find(|p| p.id == id)
@@ -387,7 +387,7 @@ impl Executor {
     /// * `id` - Identifier of the tracked process.
     pub fn kill_process(&self, id: u64) {
         let pid = {
-            let g = self.state.lock().unwrap();
+            let g = self.state.lock().expect("executor state mutex poisoned");
             g.processes.iter().find(|p| p.id == id).and_then(|p| p.pid)
         };
 
@@ -415,7 +415,7 @@ impl Executor {
     /// `SIGTERM` to the process group on Unix and marks it as killed.
     pub fn kill_all_running(&self) {
         let running_ids: Vec<u64> = {
-            let g = self.state.lock().unwrap();
+            let g = self.state.lock().expect("executor state mutex poisoned");
             g.processes
                 .iter()
                 .filter(|p| p.status.is_running())
@@ -528,6 +528,7 @@ pub async fn run_and_track(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn test_process_status_label() {
@@ -781,6 +782,27 @@ mod tests {
         }
     }
 
+    /// Polls the executor until the tracked process is no longer running, or a
+    /// timeout elapses. Returns the final summary.
+    async fn wait_for_completion(executor: &Executor, id: u64, timeout: Duration) -> ProcessSummary {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let summaries = executor.get_summaries();
+            if let Some(s) = summaries.iter().find(|s| s.id == id)
+                && !s.status.is_running()
+            {
+                return s.clone();
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "tracked process #{} did not complete within {:?}",
+                id,
+                timeout
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+
     #[tokio::test]
     async fn test_run_and_track_success() {
         use std::sync::Arc;
@@ -790,9 +812,7 @@ mod tests {
         let executor = Arc::new(Executor::new());
         let id = executor.add_process("/m", "s", "c", None);
         run_and_track(executor.clone(), id, script, dir.path().to_path_buf()).await;
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let summary = &executor.get_summaries()[0];
-        assert!(!summary.status.is_running());
+        let summary = wait_for_completion(&executor, id, Duration::from_secs(5)).await;
         assert_eq!(summary.status.label(), "Done(0)");
         let output = executor.get_output(id);
         assert!(output.iter().any(|l| l.contains("hello")));
@@ -807,8 +827,7 @@ mod tests {
         let executor = Arc::new(Executor::new());
         let id = executor.add_process("/m", "s", "c", None);
         run_and_track(executor.clone(), id, script, dir.path().to_path_buf()).await;
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let summary = &executor.get_summaries()[0];
+        let summary = wait_for_completion(&executor, id, Duration::from_secs(5)).await;
         assert!(!summary.status.is_running());
         let output = executor.get_output(id);
         assert!(output.iter().any(|l| l.contains("[err]")));
@@ -826,8 +845,7 @@ mod tests {
             std::path::PathBuf::from("/tmp"),
         )
         .await;
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let summary = &executor.get_summaries()[0];
+        let summary = wait_for_completion(&executor, id, Duration::from_secs(5)).await;
         assert!(!summary.status.is_running());
     }
 }

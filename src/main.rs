@@ -43,7 +43,8 @@ pub mod types;
 /// # Errors
 ///
 /// Returns an error if the configuration or client cannot be created, or if
-/// the selected subcommand fails.
+/// the selected subcommand fails. A script exit code from the `run` command
+/// is propagated as the process exit code.
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
@@ -69,6 +70,20 @@ async fn main() -> Result<()> {
     } else {
         client::MoldXClient::new(config)?
     };
-    cli.exec_with(&client).await?;
-    Ok(())
+    match cli.exec_with(&client).await {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            // A command's non-zero exit code becomes MoldX's process exit
+            // code. This is handled at the top of the call stack so that all
+            // cleanup (e.g. dropped tracked processes and flushed output) runs
+            // before the process terminates.
+            if let Some(errors::MoldXError2::ProcessNonZeroExit { code }) =
+                err.downcast_ref::<errors::MoldXError2>()
+                && *code != 0
+            {
+                std::process::exit(*code);
+            }
+            Err(err)
+        }
+    }
 }

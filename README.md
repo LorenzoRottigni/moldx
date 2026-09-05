@@ -354,6 +354,46 @@ Module discovery is recursive and limited by the configured maximum resolution d
 
 This prevents MoldX from unnecessarily traversing the entire filesystem while still supporting common monorepo layouts.
 
+## Security
+
+MoldX executes the scripts it discovers in `.moldx` on your machine with the
+same privileges as the shell that runs `moldx`. Because the structure of the
+project becomes the configuration, the `.moldx` directory is **executable
+code**, not inert metadata.
+
+### Trusting a project
+
+Running `moldx` in a repository causes its `.moldx/bin/*.sh` command scripts
+to be executed. Treat `.moldx` the same way you would treat the repository's
+`Makefile`, `package.json` scripts, or CI workflows:
+
+- Only run `moldx` in repositories you trust.
+- Before running it in a repository you did not author, review the `.moldx`
+  directory (especially `bin/` command scripts and profile definitions).
+- Keep `.moldx` in version control, but be aware that cloning someone else's
+  repository brings their `.moldx` scripts along with it.
+
+None of these scripts are executed until you run a command that resolves them;
+merely invoking `moldx list` or `moldx detect` discovers structure without
+running any command script.
+
+### Environment variables
+
+MoldX behavior can be redirected through environment variables such as
+`MOLDX_DIR` (see [Configuration](#configuration)). If you launch `moldx` in a
+context where these variables are set by an untrusted source, MoldX may load
+and later execute scripts from a directory you did not intend. When running
+in non-interactive or CI contexts, pin `MOLDX_DIR` explicitly to the project
+you intend to operate on.
+
+### What MoldX does not do
+
+MoldX does not sandbox or isolate the scripts it executes. Command scripts
+run with your full user privileges and can read, write, and execute anything
+your user account can. Use standard precautions: run `moldx` as an
+unprivileged user, and treat third-party `.moldx` definitions as untrusted
+until reviewed.
+
 ## Configuration
 
 MoldX is designed to be **configuration-light**.
@@ -367,8 +407,14 @@ Global path-resolution and naming behavior can be customized through command-lin
 | `MOLDX_DIR` | `--moldx-dir` | `./.moldx` | Path to the MoldX directory |
 | `MOLDX_PROFILES_DIR_NAME` | `--profiles-dir-name` | `profiles` | Profiles directory name |
 | `MOLDX_BIN_DIR_NAME` | `--bin-dir-name` | `bin` | Commands directory name inside a profile |
-| `MOLDX_TEMPLATE_DIR_NAME` | `--template-dir-name` | `template` | Template directory naming convention |
-| `MOLDX_MAX_RESOLUTION_DEPTH` | `--max-resolution-depth` | implementation-defined | Maximum recursion depth for `.moldx` and module resolution |
+| `MOLDX_TEMPLATES_DIR_NAME` | `--templates-dir-name` | `templates` | Command template file-names discovery directory |
+| `MOLDX_TEMPLATE_DIR_NAME` | `--template-dir-name` | `template` | Marker files directory used to identify a profile's modules |
+| `MOLDX_MODULES_DIR` | `--modules-dir` | `.moldx`'s parent | Root directory scanned for modules (defaults to the parent of the resolved `.moldx` directory) |
+| `MOLDX_MAX_RESOLUTION_DEPTH` | `--max-resolution-depth` | `20` | Maximum recursion depth for `.moldx` and module resolution |
+
+Additionally, `--skip-conflicts` (a global flag with no environment variable)
+automatically selects the first matching command when multiple profiles expose
+the same command.
 
 ## TUI
 
@@ -502,6 +548,36 @@ MoldX automatically resolves the playground's `.moldx` directory, making it poss
 The playground should be treated as an integration-testing environment for MoldX itself.
 
 ### Testing
+
+MoldX ships with three test suites that run automatically in CI on every push
+and pull request:
+
+- **Unit tests** (`cargo test --bin moldx`) cover the core modules: profile and
+  module resolution, template matching, command discovery, path discovery, the
+  executor's process tracking, and the TUI state machine.
+- **E2E tests** (`cargo test --test e2e`) exercise the compiled binary against
+  the [playground](#playground) monorepo, asserting that `detect`, `list`, and
+  `run` behave correctly against real profiles, templates, and modules — for
+  example multi-profile modules, nested profiles, glob matching, and conflict
+  resolution.
+- **README tests** (`cargo test --test readme`) validate that the behaviors
+  documented in this file (e.g. `init`, glob patterns, and command options)
+  actually work as described.
+
+CI also enforces `cargo clippy --all-targets -- -D warnings`, so the codebase
+must be free of warnings to merge.
+
+To run every test locally:
+
+```bash
+cargo test
+```
+
+Coverage is measured with [`cargo llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov):
+
+```bash
+cargo llvm-cov
+```
 
 ### Release
 

@@ -14,7 +14,11 @@ fi
 echo "[moldx] docker/logs: fetching logs for '$CONTAINER_NAME'"
 
 if command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1; then
-  docker logs "$@" "$CONTAINER_NAME"
+  if ! docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+    echo "[moldx] docker/logs: container '$CONTAINER_NAME' not found — start it first to see real logs"
+  else
+    docker logs "$@" "$CONTAINER_NAME"
+  fi
 else
   echo "[moldx] docker/logs: 'docker' unavailable (CLI or daemon missing) — start the container to see real logs"
 fi

@@ -230,6 +230,20 @@ fn help_flag_exits_successfully() {
 }
 
 #[test]
+fn version_commands_work_without_project_configuration() {
+    moldx()
+        .arg("version")
+        .assert()
+        .success()
+        .stdout(contains(env!("CARGO_PKG_VERSION")));
+    moldx()
+        .arg("--version")
+        .assert()
+        .success()
+        .stdout(contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
 fn detect_help_shows_subcommand() {
     moldx().args(["detect", "--help"]).assert().success();
 }

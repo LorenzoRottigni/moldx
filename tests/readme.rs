@@ -232,12 +232,12 @@ fn root_profile_agnostic_command_runs_without_module() {
     let moldx_dir = tmp.path().join(".moldx");
     fs::create_dir_all(moldx_dir.join("bin")).unwrap();
     fs::write(
-        moldx_dir.join("bin/version.sh"),
+        moldx_dir.join("bin/announce.sh"),
         "#!/usr/bin/env bash\nprintf 'moldx-version %s\\n' \"$1\"\n",
     )
     .unwrap();
 
-    cmd_in(&tmp, &moldx_dir, &["version", "--", "1.0.0"])
+    cmd_in(&tmp, &moldx_dir, &["announce", "--", "1.0.0"])
         .assert()
         .success()
         .stdout(contains("moldx-version 1.0.0"));

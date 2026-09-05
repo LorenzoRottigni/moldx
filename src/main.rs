@@ -47,6 +47,10 @@ pub mod types;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = cli::Cli::parse();
+    if matches!(&cli.command, Some(cli::Command::Version)) {
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
     // Scaffolding commands (init/new) may create `.moldx` and therefore must
     // not fail when the directory does not yet exist.
     let create_if_missing = matches!(

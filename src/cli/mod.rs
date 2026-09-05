@@ -19,6 +19,7 @@ pub mod commands;
 /// Global options configure the MoldX project layout and can also be
 /// provided through environment variables.
 #[derive(Parser)]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -108,6 +109,9 @@ impl Cli {
 /// Available subcommands.
 #[derive(Subcommand)]
 pub enum Command {
+    /// Print the MoldX version.
+    Version,
+
     /// Launch the interactive terminal UI
     Ui,
 
@@ -143,6 +147,10 @@ pub enum Command {
 impl Command {
     async fn exec_with(self, client: &MoldXClient, skip_conflicts: bool) -> Result<()> {
         match self {
+            Self::Version => {
+                println!("{}", env!("CARGO_PKG_VERSION"));
+                Ok(())
+            }
             Self::Ui => commands::ui::ui(client).await,
             Self::Detect { path } => commands::detect::detect(client, path).await,
             Self::Status => commands::status::status(client).await,

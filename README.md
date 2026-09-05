@@ -61,23 +61,33 @@ SHA256SUMS
 
 Download the appropriate archive from the [GitHub Releases](https://github.com/LorenzoRottigni/moldx/releases) page and verify it against `SHA256SUMS`.
 
-On Linux or macOS, the installer selects the current CPU architecture,
+On Linux or macOS, the setup script selects the current CPU architecture,
 downloads the latest release archive, and verifies its checksum:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/bin/setup/install.sh | bash
 ```
 
 To install a specific version or directory:
 
 ```bash
-MOLDX_VERSION=v0.1.0 MOLDX_INSTALL_DIR="$HOME/.local/bin" \
-    curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/install.sh | bash
+MOLDX_VERSION=v0.0.2 MOLDX_INSTALL_DIR="$HOME/.local/bin" \
+    curl -fsSL https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/bin/setup/install.sh | bash
 ```
 
-On Windows, download `moldx-windows-x86_64-vX.Y.Z.zip` or
-`moldx-windows-aarch64-vX.Y.Z.zip` from GitHub Releases, verify its SHA256
-entry, extract `moldx.exe`, and place it on `PATH`.
+On Windows PowerShell, run the setup script. It selects x86_64 or ARM64,
+downloads the matching archive, verifies its checksum, and installs `moldx.exe`:
+
+```powershell
+irm https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/bin/setup/install.ps1 | iex
+```
+
+To install a specific Windows version:
+
+```powershell
+$env:MOLDX_VERSION = "v0.0.3"
+irm https://raw.githubusercontent.com/LorenzoRottigni/moldx/main/bin/setup/install.ps1 | iex
+```
 
 > **Note:** Installation through package managers for common Linux distributions is planned.
 
